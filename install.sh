@@ -5,7 +5,7 @@ echo "Installing heavymeta cli..."
 
 BASE_DIR="${XDG_CONFIG_HOME:-$HOME}"
 LOCAL_DIR="${LOCAL_DIR-"$BASE_DIR/.local"}"
-HVYM_DIR="$LOCAL_DIR/share/heavymeta-cli-TEST"
+HVYM_DIR="$LOCAL_DIR/share/heavymeta-cli"
 
 BIN_URL="https://github.com/inviti8/hvym/raw/main/dist/hvym"
 BIN_PATH="$HVYM_DIR/hvym"
