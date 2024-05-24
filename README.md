@@ -5,5 +5,5 @@ The heavymeta cli is a toolset that empowers artist to leverage the power of Web
 Installation:
 
 ```
-Coming soon...
+curl -L https://github.com/inviti8/hvym/raw/main/install.sh | bash
 ```
