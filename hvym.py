@@ -1563,8 +1563,14 @@ def icp_minter_path(quiet):
 @click.command('icp-minter-model-path')
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
 def icp_minter_model_path(quiet):
-      """Print the current ICP active project minter path"""
+      """Print the current ICP active project minter model path"""
       click.echo(_ic_minter_model_path())
+
+@click.command('icp-custom-client-path')
+@click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
+def icp_custom_client_path(quiet):
+      """Print the current ICP active project custom client project path"""
+      click.echo(_ic_custom_client_path())
 
 @click.command('icp-model-path')
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
@@ -1814,6 +1820,7 @@ cli.add_command(icp_project)
 cli.add_command(icp_project_path)
 cli.add_command(icp_minter_path)
 cli.add_command(icp_minter_model_path)
+cli.add_command(icp_custom_client_path)
 cli.add_command(icp_model_path)
 cli.add_command(icp_init)
 cli.add_command(icp_debug_model)
