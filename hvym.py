@@ -16,9 +16,16 @@ from gifanimus import GifAnimation
 from pathlib import Path
 import numbers
 import hashlib
-import dload
 import re
 import time
+import ast
+from io import BytesIO
+from urllib.request import urlopen
+from zipfile import ZipFile
+from tinydb import TinyDB, Query
+import xml.etree.ElementTree as ET
+from base64 import b64encode
+from gradientmessagebox import ColorConfig, PresetLoadingMessage, PresetImageBgMessage, PresetFileSelectWindow, PresetPromptWindow, PresetChoiceWindow, PresetDropDownWindow, PresetChoiceEntryWindow, PresetChoiceMultilineEntryWindow, PresetCopyTextWindow, PresetUserPasswordWindow
 
 ABOUT = """
 Command Line Interface for Heavymeta Standard NFT Data
@@ -38,14 +45,23 @@ TEMPLATE_CUSTOM_CLIENT_JS = 'custom_client_frontend_js_template.txt'
 TEMPLATE_MODEL_MINTER_MAIN = 'model_minter_backend_main_template.txt'
 TEMPLATE_MODEL_MINTER_TYPES = 'model_minter_backend_types_template.txt'
 
-MODEL_MINTER_REPO = 'https://github.com/inviti8/hvym_minter_template.git'
+MODEL_DEBUG_ZIP = 'https://github.com/inviti8/hvym_model_debug_template/archive/refs/heads/main.zip'
 MODEL_MINTER_ZIP = 'https://github.com/inviti8/hvym_minter_template/archive/refs/heads/master.zip'
 CUSTOM_CLIENT_ZIP = 'https://github.com/inviti8/hvym_custom_client_template/archive/refs/heads/master.zip'
+MODEL_DEBUG_TEMPLATE = 'hvym_model_debug_template-main'
 MINTER_TEMPLATE = 'hvym_minter_template-master'
-MODEL_TEMPLATE = 'model'
 CUSTOM_CLIENT_TEMPLATE = 'hvym_custom_client_template-main'
 LOADING_IMG = os.path.join(FILE_PATH, 'images', 'loading.gif')
 BUILDING_IMG = os.path.join(FILE_PATH, 'images', 'building.gif')
+BG_IMG = os.path.join(FILE_PATH, 'images', 'hvym_3d_logo.png')
+LOGO_IMG = os.path.join(FILE_PATH, 'images', 'logo.png')
+NPM_LINKS = os.path.join(FILE_PATH, 'npm_links')
+FG_TXT_COLOR = '#98314a'
+
+
+STORAGE = TinyDB(os.path.join(FILE_PATH, 'data', 'db.json'))
+IC_IDS = STORAGE.table('ic_identities')
+IC_PROJECTS = STORAGE.table('ic_projects')
 
 
 #Material Data classes
@@ -660,6 +676,8 @@ class interactable_data_class(base_data_class):
       Base data class for hvym interactables properties
       :param interactable: Bool for interaction type
       :type interactable:  (bool)
+      :param has_return: Bool if true, the associated call retturns value
+      :type has_return:  (bool)
       :param interaction_type: String for interaction type
       :type interaction_type:  (str)
       :param name: String for interaction name
@@ -674,6 +692,7 @@ class interactable_data_class(base_data_class):
       :type int_param:  (int)
       '''
       interactable: bool
+      has_return: bool
       interaction_type: str
       name: str
       call: str
@@ -711,6 +730,7 @@ class model_debug_data(base_data_class):
       
 def _new_session(chain, name):
       home = os.path.expanduser("~").replace('\\', '/') if os.name == 'nt' else os.path.expanduser("~")
+      _link_hvym_npm_modules()
 
       app_dirs = PlatformDirs('heavymeta-cli', 'HeavyMeta')
       path = os.path.join(app_dirs.user_data_dir, f'{chain}', name)
@@ -740,6 +760,10 @@ def _get_session(chain):
 
       return path
 
+def _download_unzip(url, out_path):
+      with urlopen(url) as zipresp:
+          with ZipFile(BytesIO(zipresp.read())) as zfile:
+              zfile.extractall(out_path)
 
 def _run_command(cmd):
       process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
@@ -750,7 +774,10 @@ def _run_command(cmd):
       else:
         print(output.decode('utf-8'))
 
-def _run_futures_cmds(path, cmds, procImg=LOADING_IMG):
+
+def _run_futures_cmds(path, cmds, procImg=LOADING_IMG, loadingMsg=None):
+      if loadingMsg!=None:
+            loadingMsg.Close()
       loading = GifAnimation(procImg, 1000, True, '', True)
       loading.Play()
       with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -759,7 +786,6 @@ def _run_futures_cmds(path, cmds, procImg=LOADING_IMG):
         for future in concurrent.futures.as_completed(futures):
             try:
                 result = future.result(timeout=5) 
-                #print( result.stdout)
                 
             except Exception as e:  
                 print("Command failed with error:", str(e))
@@ -767,12 +793,12 @@ def _run_futures_cmds(path, cmds, procImg=LOADING_IMG):
       loading.Stop()
                 
 
-def _futures(chain, folders, commands, procImg=LOADING_IMG):
+def _futures(chain, folders, commands, procImg=LOADING_IMG, loadingMsg=None):
       session = _get_session(chain)
       path = os.path.join(*folders)
       asset_path = os.path.join(session, path)
 
-      _run_futures_cmds(asset_path, commands, procImg)
+      _run_futures_cmds(asset_path, commands, procImg, loadingMsg)
     
 
 def _subprocess_output(command, path, procImg=LOADING_IMG):
@@ -802,21 +828,11 @@ def _create_hex(value):
       sha256_hash = hashlib.sha256()
       sha256_hash.update(value)
       return sha256_hash.hexdigest()
-
-
-def _icp_set_network(name, port):
-      """Set the ICP network."""
-      config_dir = user_config_dir()  # Gets the path to the config directory.
-      networks_config = os.path.join(config_dir, 'dfx', 'networks.json')
-
-      if not os.path.exists(networks_config):  # If networks.json does not exist
-        with open(networks_config, 'w') as file:
-            json.dump({"local": {"replica": {"bind": f"localhost:{port}","subnet_type": "application"}}}, file)
             
 
 def _set_hvym_network():
       """Set the ICP  Heavymeta network."""
-      _icp_set_network('hvym', 1357)
+      _ic_set_network('hvym', 1357)
     
 
 def _extract_urls(output):
@@ -883,6 +899,97 @@ def _mat_save_data(mat_ref, mat_type, reflective=False, iridescent=False, sheen=
       return props
 
 
+def _ic_set_network(name, port):
+      """Set the ICP network."""
+      config_dir = user_config_dir()  # Gets the path to the config directory.
+      networks_config = os.path.join(config_dir, 'dfx', 'networks.json')
+
+      if not os.path.exists(networks_config):  # If networks.json does not exist
+        with open(networks_config, 'w') as file:
+            json.dump({"local": {"replica": {"bind": f"localhost:{port}","subnet_type": "application"}}}, file)
+
+
+def _ic_get_ids():
+      """Get the ICP identities installed on this computer."""
+      command = 'dfx identity list'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      return output.stdout
+
+
+def _ic_get_active_id():
+      """Get the active ICP Identity on this computer."""
+      command = 'dfx identity whoami'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      return output.stdout
+
+
+def _ic_get_principal():
+      command = f'dfx identity get-principal'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      return output.stdout
+
+
+def _ic_id_info():
+      find = Query()
+      return IC_IDS.get(find.data_type == 'IC_ID_INFO')
+
+
+def _ic_set_id(cryptonym):
+      command = f'dfx identity use {cryptonym}'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      _ic_update_data()
+      return output.stdout
+
+def _ic_new_id(cryptonym):
+      return subprocess.check_output(f'dfx identity new {cryptonym}', shell=True, stderr=subprocess.STDOUT).decode("utf-8") 
+
+def _ic_update_data():
+      """Update local db with currently installed icp ids."""
+      ids = _ic_get_ids()
+      active = _ic_get_active_id()
+      principal = _ic_get_principal()
+      ids=ids.split('\n')
+      tables=[]
+      id_arr=[]
+      
+      for _id in ids:
+            if _id.strip() == active.strip():
+                  tables.append({'data_type': 'IC_ID_STATUS', 'id':_id.strip(), 'active': True})
+                  id_arr.append(_id.strip())
+            elif _id != '':
+                  tables.append({'data_type': 'IC_ID_STATUS', 'id':_id.strip(), 'active': False})
+                  id_arr.append(_id.strip())
+
+      find = Query()
+
+      #Remove any ids from local storage that are no longer in dfx
+      stored_ids = IC_IDS.search(find.data_type == 'IC_ID_STATUS')
+      if len(IC_IDS.search(find.data_type == 'IC_ID_STATUS'))>len(id_arr):
+            for table in stored_ids:
+                  if not table['id'] in id_arr:
+                        old_data = IC_IDS.get(find.id == table['id'])
+                        IC_IDS.remove(doc_ids=[old_data.doc_id])
+      
+      for table in tables:
+            if len(IC_IDS.search(find.id == table['id']))==0:
+                  IC_IDS.insert(table)
+            else:
+                  IC_IDS.update(table, find.id == table['id'])
+
+
+      #reorder list so active id is at the top
+      for _id in id_arr:
+            id_data = IC_IDS.search(find.id == _id)[0]
+            if id_data['active']:
+                  id_arr.insert(0, id_arr.pop(id_arr.index(_id)))
+
+      table = {'data_type': 'IC_ID_INFO', 'active_id': id_arr[0], 'principal':principal.strip(), 'list':id_arr}
+      if len(IC_IDS.search(find.data_type == 'IC_ID_INFO'))==0:
+            IC_IDS.insert(table)
+      else:
+            IC_IDS.update(table, find.data_type == 'IC_ID_INFO')
+
+
 def _ic_create_model_repo(path):
       folder = 'dapp'
       project_name = 'model_view'
@@ -924,15 +1031,32 @@ def _ic_create_model_repo(path):
       with open(os.path.join(path, 'Assets', 'dfx.json'), 'w') as f:
         json.dump(dfx_json, f)
 
+def _ic_create_model_debug_repo(path):
+      _download_unzip(MODEL_DEBUG_ZIP, path)
+
+def _ic_install_model_debug_repo(path):
+      _ic_create_model_debug_repo(_get_session('icp'))
+      _npm_install(path)
+      _npm_link_module('hvym-proprium', path)
 
 def _ic_create_model_minter_repo(path):
-     dload.save_unzip(MODEL_MINTER_ZIP, path)
+      _download_unzip(MODEL_MINTER_ZIP, path)
+
+def _ic_install_model_minter_repo(path):
+      _ic_create_model_minter_repo(_get_session('icp'))
+      _npm_install(path)
+      _npm_link_module('hvym-proprium', path)
 
 def _ic_create_custom_client_repo(path):
-     dload.save_unzip(CUSTOM_CLIENT_ZIP, path)
+      _download_unzip(CUSTOM_CLIENT_ZIP, path)
 
-def _ic_model_path():
-      return os.path.join(_get_session('icp'), MODEL_TEMPLATE)
+def _ic_install_custom_client_repo(path):
+      _ic_create_custom_client_repo(_get_session('icp'))
+      _npm_install(path)
+      _npm_link_module('hvym-proprium', path)
+
+def _ic_model_debug_path():
+      return os.path.join(_get_session('icp'), MODEL_DEBUG_TEMPLATE)
       
 def _ic_minter_path():
       return os.path.join(_get_session('icp'), MINTER_TEMPLATE)
@@ -943,6 +1067,7 @@ def _ic_custom_client_path():
 def _ic_minter_model_path():
       return os.path.join(_ic_minter_path(), 'src', 'proprium_minter_frontend', 'assets')
 
+
 def _npm_install(path, loading=None):
       try:
             _subprocess_output('npm install', path) 
@@ -952,6 +1077,69 @@ def _npm_install(path, loading=None):
 
       if loading != None:
             loading.Stop()
+
+def _npm_new_link(path):
+      try:
+            output = subprocess.check_output('npm link', cwd=path, shell=True, stderr=subprocess.STDOUT)
+            print(output.decode('utf-8'))
+
+      except Exception as e:  
+            print("Command failed with error:", str(e))
+
+def _npm_link_module(module, path):
+      try:
+            output = subprocess.check_output(f'npm link {module}', cwd=path, shell=True, stderr=subprocess.STDOUT)
+            print(output.decode('utf-8'))
+
+      except Exception as e:  
+            print("Command failed with error:", str(e))
+
+def _npm_unlink(module):
+      try:
+            command = f'npm unlink {module} --global'
+            output = subprocess.run(command, shell=True, capture_output=True, text=True)
+
+      except Exception as e:  
+            print("Command failed with error:", str(e))
+
+def _npm_list_links():
+      command = 'npm ls --link --global'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      return re.split(r'\s+|\n', output.stdout)
+
+def _module_is_linked(module):
+      result = False
+      for txt in _npm_list_links():
+            if module in txt:
+                  result = True
+                  break
+      return result
+
+def _link_hvym_npm_modules():
+      
+      dirs = PlatformDirs('heavymeta-cli', 'HeavyMeta')
+      npm_links = os.path.join(dirs.user_data_dir, "npm_links")
+
+      if not os.path.exists(npm_links):
+            try:
+                  shutil.copytree(NPM_LINKS, npm_links)
+                      
+            except Exception as e:  
+                  print("Copy custom backend failed with:", str(e))
+                  return
+
+            for dirpath in next(os.walk(npm_links))[1]:
+                  module_path = os.path.join(npm_links, dirpath)
+                  pkg_json = os.path.join(module_path, 'package.json')
+                  module = None
+                  if os.path.isfile(pkg_json):
+                        with open(pkg_json, 'r+', encoding='utf-8') as file:
+                              data = json.load(file)
+                              module = data['name']
+                  if not _module_is_linked(module):
+                        if os.path.isdir(module_path):
+                              _npm_install(module_path)
+                              _npm_new_link(module_path)
 
 def _parse_hvym_data(hvym_data, model):
       all_val_props = {}
@@ -989,11 +1177,10 @@ def _load_hvym_data(model_path):
       result = None
       if os.path.isfile(model_path):
             gltf = GLTF2().load(model_path)
-
-      if 'HVYM_nft_data' in gltf.extensions.keys():
-        result = gltf.extensions['HVYM_nft_data']
-      else:
-        click.echo("No Heavymeta Data in model.")
+            if 'HVYM_nft_data' in gltf.extensions.keys():
+              result = gltf.extensions['HVYM_nft_data']
+            else:
+              click.echo("No Heavymeta Data in model.")
 
       return result
 
@@ -1005,7 +1192,30 @@ def _render_template(template_file, data, out_file_path):
       with open(out_file_path, 'w') as f:
         output = template.render(data=data)
         f.write(output)
-      
+
+def _svg_to_data_url(svgfile):
+    tree = ET.parse(svgfile)
+    root = tree.getroot()
+
+    # Remove XML declaration and namespaces
+    if len(root.attrib) > 0:
+      if 'xmlns' in root.attrib:
+        root.attrib.pop('xmlns')
+        for child in root:
+            child.attrib.pop('xmlns', None)
+    
+    svg_str = ET.tostring(root, encoding='unicode')
+    
+    # Convert SVG to base64 and format it as a data URL
+    return f"data:image/svg+xml;base64,{b64encode(svg_str.encode('utf-8')).decode('utf-8')}"
+
+
+def _png_to_data_url(pngfile):
+    with open(pngfile, "rb") as image_file:
+        encoded_string = b64encode(image_file.read()).decode('utf-8')
+    
+    return f"data:image/png;base64,{encoded_string}"
+
 
 @click.group()
 def cli():
@@ -1027,6 +1237,7 @@ def parse_blender_hvym_interactables(obj_data):
                               mesh_set.append({'name':child['name'], 'visible': True})
                   d = interactable_data_class(
                         obj['hvym_interactable'],
+                        obj['hvym_interactable_has_return'],
                         obj['hvym_mesh_interaction_type'],
                         obj['hvym_mesh_interaction_name'],
                         obj['hvym_mesh_interaction_call'],
@@ -1489,7 +1700,24 @@ def icp_new_cryptonym(cryptonym):
       """Create a new cryptonym, (alias/identity) for the Internet Computer Protocol."""
       command = f'dfx identity new {cryptonym} --storage-mode password-protected'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
-      print('Command output:', output.stdout)
+      click.echo('Command output:', output.stdout)
+
+
+@click.command('icp-id-list')
+def icp_id_list():
+      """Get a list of identitys on this machine."""
+      command = 'dfx identity list'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      click.echo(output.stdout)
+
+
+@click.command('icp-use-id')
+@click.argument('cryptonym', type=str)
+def icp_use_id(cryptonym):
+      """Set the icp id for this machine."""
+      command = f'dfx identity use {cryptonym}'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      click.echo(output.stdout)
 
 
 @click.command('icp-use-cryptonym')
@@ -1498,7 +1726,7 @@ def icp_use_cryptonym(cryptonym):
       """Use a cryptonym, (alias/identity) for the Internet Computer Protocol."""
       command = f'dfx identity use {cryptonym}'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
-      print('Command output:', output.stdout)
+      click.echo('Command output:', output.stdout)
 
 
 @click.command('icp-account')
@@ -1506,7 +1734,7 @@ def icp_account(cryptonym):
       """Get the account number for the current active account."""
       command = f'dfx ledger account-id'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
-      print('Command output:', output.stdout)
+      click.echo('Command output:', output.stdout)
 
 
 @click.command('icp-principal')
@@ -1531,25 +1759,32 @@ def icp_balance():
       """Get the current balance of ic for current account."""
       command = f'dfx ledger --network ic balance'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
-      print('Command output:', output.stdout)
+      click.echo('Command output:', output.stdout)
 
 
 @click.command('icp-start-assets')
 @click.argument('project_type')
 def icp_start_assets(project_type): 
       """Start dfx in the current assets folder."""
+      loading = PresetLoadingMessage('STARTING DFX DAEMON')
       _set_hvym_network()
       if project_type == 'model':
-            _futures('icp', [MODEL_TEMPLATE, 'Assets'], ['dfx start --clean --background'])
+            _futures('icp', [MODEL_DEBUG_TEMPLATE], ['dfx start --clean --background'], None)
       elif project_type == 'minter':
-            _futures('icp', [MINTER_TEMPLATE], ['dfx start --clean --background'])
+            _futures('icp', [MINTER_TEMPLATE], ['dfx start --clean --background'], None)
       elif project_type == 'custom':
-            _futures('icp', [CUSTOM_CLIENT_TEMPLATE], ['dfx start --clean --background'])
+            _futures('icp', [CUSTOM_CLIENT_TEMPLATE], ['dfx start --clean --background'], None)
                 
 
 @click.command('icp-stop-assets')
-def icp_stop_assets():
-      _futures('icp', [MODEL_TEMPLATE, 'Assets'], [ 'dfx stop'])
+@click.argument('project_type')
+def icp_stop_assets(project_type):
+      if project_type == 'model':
+            _futures('icp', [MODEL_DEBUG_TEMPLATE], ['dfx stop'], None)
+      elif project_type == 'minter':
+            _futures('icp', [MINTER_TEMPLATE], ['dfx stop'], None)
+      elif project_type == 'custom':
+            _futures('icp', [CUSTOM_CLIENT_TEMPLATE], ['dfx stop'], None)
 
 
 @click.command('icp-deploy-assets')
@@ -1561,7 +1796,7 @@ def icp_deploy_assets(project_type, test):
       if not test:
         command += ' ic'
 
-      folders = [MODEL_TEMPLATE, 'Assets']
+      folders = [MODEL_DEBUG_TEMPLATE]
 
       if project_type == 'minter':
             folders = [MINTER_TEMPLATE]
@@ -1595,6 +1830,17 @@ def icp_backup_keys(identity_name, out_path, quiet):
       shutil.copyfile(src_path, dest_path)
 
       click.echo(f"The keys have been successfully backed up at: {dest_path}")
+
+
+@click.command('icp-export-project')
+@click.argument('out_path')
+def icp_export_project(out_path):
+      """Export the working icp project to destination path"""
+      try:
+            shutil.copytree(_get_session('icp'), out_path)
+                
+      except Exception as e:  
+            click.echo("Export project failed with:", str(e))
     
 
 @click.command('icp-project')
@@ -1619,11 +1865,13 @@ def icp_minter_path(quiet):
       """Print the current ICP active project minter path"""
       click.echo(_ic_minter_path())
 
+
 @click.command('icp-minter-model-path')
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
 def icp_minter_model_path(quiet):
       """Print the current ICP active project minter model path"""
       click.echo(_ic_minter_model_path())
+
 
 @click.command('icp-custom-client-path')
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
@@ -1631,11 +1879,40 @@ def icp_custom_client_path(quiet):
       """Print the current ICP active project custom client project path"""
       click.echo(_ic_custom_client_path())
 
+
 @click.command('icp-model-path')
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Don't echo anything.")
 def icp_model_path(quiet):
       """Print the current ICP active project minter path"""
-      click.echo(_ic_model_path())
+      click.echo(_ic_model_debug_path())
+
+
+@click.command('icp-account-info')
+def icp_account_info():
+      """Get active icp account info"""
+      click.echo(_ic_id_info())
+
+
+@click.command('icp-set-account')
+@click.option('--quiet', '-q', is_flag=True, default=False, help="No confirmation.")
+def icp_set_account(quiet):
+      """Set the icp account"""
+      if quiet:
+            click.echo(_ic_account_dropdown_popup(False))
+      else:
+            click.echo(_ic_account_dropdown_popup())
+
+
+@click.command('icp-new-account')
+def icp_new_account():
+      """Create a new icp account"""
+      click.echo(_ic_new_account_popup())
+
+
+@click.command('img-to-url')
+@click.argument('msg', type=str)
+def img_to_url(msg):
+      click.echo(_prompt_img_convert_to_url(msg))
 
 
 @click.command('icp-init')
@@ -1645,8 +1922,8 @@ def icp_model_path(quiet):
 def icp_init(project_type, force, quiet):
       """Intialize project directories"""
       loading = GifAnimation(LOADING_IMG, 1000, True, '', True)
-      loading.Play()
-      model_path = _ic_model_path()
+      
+      model_path = _ic_model_debug_path()
       minter_path = _ic_minter_path()
       custom_client_path = _ic_custom_client_path()
 
@@ -1655,23 +1932,38 @@ def icp_init(project_type, force, quiet):
       if not (os.path.exists(model_path) and os.path.exists(minter_path)) or force:
         if not (force or click.confirm(f"Do you want to create a new deploy dir at {model_path}?")):
             return
+
       if project_type == 'model':
             install_path = model_path
             if not os.path.exists(model_path):
-                  _ic_create_model_repo(model_path)
+                  loading.Play()
+                  _ic_install_model_debug_repo(model_path)
+            else:
+                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  if answer == 'OK':
+                        _ic_install_model_debug_repo(model_path)
+
       if project_type == 'minter':
             install_path = minter_path
             if not os.path.exists(minter_path):
-                  _ic_create_model_minter_repo(_get_session('icp'))
-                  _npm_install(minter_path, loading)
+                  loading.Play()
+                  _ic_install_model_minter_repo(minter_path)
+            else:
+                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  if answer == 'OK':
+                        _ic_install_model_minter_repo(minter_path)
 
       if project_type == 'custom':
             install_path = custom_client_path
             if not os.path.exists(custom_client_path):
-                  _ic_create_custom_client_repo(_get_session('icp'))
-                  _npm_install(custom_client_path, loading)
+                  loading.Play()
+                  _ic_install_custom_client_repo(custom_client_path)
+            else:
+                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  if answer == 'OK':
+                        _ic_install_custom_client_repo(custom_client_path)
 
-      # loading.Stop()
+      loading.Stop()
             
       click.echo(f"Project files created at: {install_path}.")
 
@@ -1680,39 +1972,35 @@ def icp_init(project_type, force, quiet):
 @click.argument('model', type=str)
 def icp_debug_model(model):
       """Set up nft collection deploy directories & render model debug templates."""
-      path = _ic_model_path()
-      assets_dir = os.path.join(path, 'Assets')
-      src_dir = os.path.join(assets_dir, 'src')
-      model_path = os.path.join(src_dir, model)
-      model_name = model.replace('.glb', '')
-      js_file_name = 'main.js'
+      path = _ic_model_debug_path()
+      front_src_dir = os.path.join(path, 'src', 'frontend')
+      assets_dir = os.path.join(front_src_dir, 'assets')
+      model_path = os.path.join(assets_dir, model)
+      
 
       if not os.path.exists(model_path):
         click.echo(f"No model exists at path {model_path}.")
 
-      js_dir = os.path.join(src_dir, 'assets')
+      hvym_data = _load_hvym_data(model_path)
 
-      if not os.path.exists(js_dir):
-        os.makedirs(js_dir)
-        
-      file_loader = FileSystemLoader(FILE_PATH / 'templates')
-      env = Environment(loader=file_loader)
-      template = env.get_template(TEMPLATE_MODEL_VIEWER_JS)
+      if hvym_data == None:
+            return
 
-      data = model_debug_data(model, model_name, js_file_name)
-      output = template.render(data=data)
-      js_file_path = os.path.join(src_dir, 'assets',  js_file_name)
-      index_file_path = os.path.join(src_dir, 'index.html')
+      gltf = GLTF2().load(model_path)
+      if 'HVYM_nft_data' in gltf.extensions.keys():
+        hvym_data = gltf.extensions['HVYM_nft_data']
+      else:
+        click.echo("No Heavymeta Data in model.")
+        return
 
-      with open(js_file_path, 'w') as f:
-        output = template.render(data=data)
-        f.write(output)
-        
-      template = env.get_template(TEMPLATE_MODEL_VIEWER_INDEX)
+      data = _parse_hvym_data(hvym_data, model)
 
-      with open(index_file_path, 'w') as f:
-        output = template.render(data=data)
-        f.write(output)
+      out_file_path = os.path.join(front_src_dir,  'index.html')
+      _render_template(TEMPLATE_CUSTOM_CLIENT_INDEX, data, out_file_path)
+
+      out_file_path = os.path.join(front_src_dir,  'index.js')
+      _render_template(TEMPLATE_MODEL_VIEWER_JS, data, out_file_path)
+
 
 
 @click.command('icp-debug-model-minter')
@@ -1779,7 +2067,7 @@ def icp_debug_custom_client(model, backend):
         click.echo(f"Only GLTF Binary files (.glb) accepted.")
         return
 
-      model_path = os.path.join(front_src_dir, model)
+      model_path = os.path.join(front_src_dir, 'assets', model)
       hvym_data = _load_hvym_data(model_path)
 
       if hvym_data == None:
@@ -1806,19 +2094,66 @@ def icp_debug_custom_client(model, backend):
       loading.Stop()
 
 
+@click.command('svg-to-data-url')
+@click.argument('svgfile', type=str)
+def svg_to_data_url(svgfile):
+      click.echo(_svg_to_data_url(svgfile))
+
+
+@click.command('png-to-data-url')
+@click.argument('pngfile', type=str)
+def png_to_data_url(pngfile):
+      click.echo(_png_to_data_url(pngfile))
+
+@click.command('check')
+def check():
+      """For checking if cli is on the path"""
+      click.echo('ONE-TWO')
+
+@click.command('up')
+def up():
+      """Set up the cli"""
+      loading = GifAnimation(BUILDING_IMG, 1000, True, '', True)
+      loading.Play()
+      _link_hvym_npm_modules()
+      loading.Stop()
+      _splash('HEAVYMETA')
+
+@click.command('custom-loading-msg')
+@click.argument('msg', type=str)
+def custom_loading_msg(msg):
+      """ Show custom loading message based on passed msg arg."""
+      loading = PresetLoadingMessage(msg=msg)
+      _config_popup(loading)
+      #loading.custom_txt_color(FG_TXT_COLOR)
+      loading.Play()
+      time.sleep(5)
+      loading.Close()
+
+
+@click.command('custom-prompt')
+@click.argument('msg', type=str)
+def custom_prompt(msg):
+      _prompt_popup(f'{msg}')
+
+
+@click.command('custom-choice-prompt')
+@click.argument('msg', type=str)
+def custom_choice_prompt(msg):
+      click.echo(_choice_popup(f'{msg}'))
+
+
+@click.command('splash')
+def splash():
+      """Show Heavymeta Splash"""
+      _splash('HEAVYMETA')
+
+
 @click.command('test')
 def test():
       """Set up nft collection deploy directories"""
-      loading = GifAnimation(LOADING_IMG, 1000, True, '', True)
-
-      time.sleep(3)
-
-      loading.Play()
-
-      time.sleep(10)
-
-      loading.Stop()
-
+      _ic_new_account_popup()
+      #_ic_account_dropdown_popup()
 
 
 @click.command('print-hvym-data')
@@ -1848,6 +2183,100 @@ def about():
       click.echo(ABOUT)
 
 
+'''popup creation methods:'''
+
+def _config_popup(popup):
+      popup.fg_luminance(0.8)
+      popup.bg_saturation(0.6)
+      popup.bg_luminance(0.4)
+      popup.custom_msg_color(FG_TXT_COLOR)
+
+def _splash(text):
+      splash = PresetImageBgMessage(msg=text, bg_img=BG_IMG, logo_img=LOGO_IMG)
+      splash.Play()
+      time.sleep(5)
+      splash.Close()
+
+def _choice_popup(msg):
+      """ Show choice popup, message based on passed msg arg."""
+      popup = PresetChoiceWindow(msg)
+      _config_popup(popup)
+      result = popup.Ask()
+      return result.response
+
+
+def _prompt_popup(msg):
+      """ Show choice popup, message based on passed msg arg."""
+      popup = PresetPromptWindow(msg)
+      _config_popup(popup)
+      popup.Prompt()
+
+def _prompt_img_convert_to_url(msg):
+      """ Show file selection popup, then convert selected file to base64 string."""
+      popup = PresetFileSelectWindow(msg)
+      popup.set_file_select_types([("SVG Files", "*.svg"), ("PNG Files", "*.png")])
+      result = None
+      _config_popup(popup)
+      file = popup.FileSelect()
+      if os.path.isfile(file.response):
+            if '.png' in file.response:
+                  result = _png_to_data_url(file.response)
+            elif '.svg' in file.response:
+                  result = _svg_to_data_url(file.response)
+
+      return result
+
+def _ic_account_dropdown_popup(confirmation=True):
+      _ic_update_data()
+      data = _ic_id_info()
+      text = '''Choose Account:'''
+      popup = PresetDropDownWindow(text,'OK')
+      _config_popup(popup)
+      select = popup.DropDown(data['list'])
+      confirm = f'''Account has been 
+changed to:
+            '''
+
+      if select.response != None and select.response != data['active_id']:
+            _ic_set_id(select.response)
+            data = _ic_id_info()
+            if confirmation:
+                  confirm += select.response
+                  popup = PresetPromptWindow(confirm)
+                  _config_popup(popup)
+                  popup.Prompt()
+
+      return data['active_id']
+
+
+def _ic_new_account_popup():
+      find = Query()
+      data = IC_IDS.get(find.data_type == 'IC_ID_INFO')
+      text = '''Enter a name for the new account:
+      '''
+      popup = PresetChoiceEntryWindow(text,'OK')
+      _config_popup(popup)
+      answer = popup.Ask()
+
+      if answer.response != None and answer.response != '' and answer.response != 'CANCEL':
+            if answer.response not in data['list']:
+                  dfx = _ic_new_id(answer.response)
+                  _ic_set_id(answer.response)
+                  arr1 = dfx.split('\n')
+                  arr2 = arr1[0].split(':')
+                  text = arr2[0].strip()+'''\nMake sure to store it in a secure place.
+                  '''
+                  seed = arr2[1]
+                  popup = PresetCopyTextWindow(text, 'COPY', 'DONE')
+                  _config_popup(popup)
+                  popup.default_entry_text(seed)
+                  popup.Ask()
+                  _ic_update_data()
+
+      return data['active_id']
+
+
+
 cli.add_command(parse_blender_hvym_interactables)
 cli.add_command(parse_blender_hvym_collection)
 cli.add_command(contract_data)
@@ -1872,6 +2301,8 @@ cli.add_command(standard_material_data)
 cli.add_command(pbr_material_data)
 cli.add_command(icp_install)
 cli.add_command(icp_new_cryptonym)
+cli.add_command(icp_id_list)
+cli.add_command(icp_use_id)
 cli.add_command(icp_use_cryptonym)
 cli.add_command(icp_account)
 cli.add_command(icp_principal)
@@ -1882,19 +2313,33 @@ cli.add_command(icp_stop_assets)
 cli.add_command(icp_deploy_assets)
 cli.add_command(icp_backup_keys)
 cli.add_command(icp_project)
+cli.add_command(icp_export_project)
 cli.add_command(icp_project_path)
 cli.add_command(icp_minter_path)
 cli.add_command(icp_minter_model_path)
 cli.add_command(icp_custom_client_path)
 cli.add_command(icp_model_path)
+cli.add_command(icp_account_info)
+cli.add_command(icp_set_account)
+cli.add_command(icp_new_account)
+cli.add_command(img_to_url)
 cli.add_command(icp_init)
 cli.add_command(icp_debug_model)
 cli.add_command(icp_debug_model_minter)
 cli.add_command(icp_debug_custom_client)
+cli.add_command(svg_to_data_url)
+cli.add_command(png_to_data_url)
+cli.add_command(check)
+cli.add_command(up)
+cli.add_command(custom_loading_msg)
+cli.add_command(custom_prompt)
+cli.add_command(custom_choice_prompt)
+cli.add_command(splash)
 cli.add_command(test)
 cli.add_command(print_hvym_data)
 cli.add_command(version)
 cli.add_command(about)
 
+_ic_update_data()
 if __name__ == '__main__':
     cli()
