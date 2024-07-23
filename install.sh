@@ -10,10 +10,11 @@ HVYM_DIR="$LOCAL_DIR/share/heavymeta-cli"
 BIN_URL="https://github.com/inviti8/hvym/raw/main/dist/linux/hvym"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     BIN_URL="https://github.com/inviti8/hvym/raw/main/dist/mac/hvym"
-BIN_PATH="$HVYM_DIR/hvym"
 fi
 
-# Create the heavymeta directory and hvym binary if it doesn't exist.
+BIN_PATH="$HVYM_DIR/hvym"
+
+# Create heavymeta directory and hvym binary if it doesn't exist.
 mkdir -p "$HVYM_DIR"
 curl -sSf -L "$BIN_URL" -o "$BIN_PATH"
 chmod +x "$BIN_PATH"
