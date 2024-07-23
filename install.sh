@@ -12,7 +12,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     BIN_URL="https://github.com/inviti8/hvym/raw/main/dist/mac/hvym"
 BIN_PATH="$HVYM_DIR/hvym"
 
-# Create the .foundry bin directory and hvym binary if it doesn't exist.
+# Create the .heavymeta bin directory and hvym binary if it doesn't exist.
 mkdir -p "$HVYM_DIR"
 curl -sSf -L "$BIN_URL" -o "$BIN_PATH"
 chmod +x "$BIN_PATH"
@@ -40,9 +40,9 @@ case $SHELL in
     exit 1
 esac
 
-# Only add hvym if it isn't already in PATH.
+# Only add metavinci if it isn't already in PATH.
 if [[ ":$PATH:" != *":${HVYM_DIR}:"* ]]; then
-    # Add the hvym directory to the path and ensure the old PATH variables remain.
+    # Add the metavinci directory to the path and ensure the old PATH variables remain.
     # If the shell is fish, echo fish_add_path instead of export.
     if [[ "$PREF_SHELL" == "fish" ]]; then
         echo >> "$PROFILE" && echo "fish_add_path -a $HVYM_DIR" >> "$PROFILE"
@@ -50,3 +50,7 @@ if [[ ":$PATH:" != *":${HVYM_DIR}:"* ]]; then
         echo >> "$PROFILE" && echo "export PATH=\"\$PATH:$HVYM_DIR\"" >> "$PROFILE"
     fi
 fi
+
+echo
+echo "Detected your preferred shell is $PREF_SHELL and added hvym to PATH."
+echo "Run 'source $PROFILE' or start a new terminal session to use hvym."
