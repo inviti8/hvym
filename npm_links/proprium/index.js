@@ -5286,6 +5286,9 @@ export class PanelEditText extends PanelBox {
     editTextProps.name = section.name;
     editTextProps.textProps.wrap = false;
     if(section.data.type == 'HVYM_TEXT_VAL_PROP_REF'){
+      if(section.data.immutable){
+        editTextProps.textProps.editText = false;
+      }
       editTextProps.objectControlProps = objectControlProps;
     }
 
@@ -8387,19 +8390,23 @@ export class InputTextWidget extends BaseWidget {
     this.inputTextSize = this.inputText.userData.size;
     this.box.userData.properties = textInputProps;
     this.inputBoxProps = inputBoxProps;
+    this.editText = textProps.editText;
     if(btnBoxProps!=undefined){
       textInputProps.buttonProps.boxProps.parent = this.box;
       this.btnBoxProps = btnBoxProps;
       this.buttonProps = textInputProps.buttonProps;
     }
     
-    this.scene.mouseOverable.push(this.inputText);
-
     if(this.buttonProps != undefined){
       this.button = this.AttachButton();
     }
 
-    this.HandleTextInputSetup();
+    if(this.editText){
+      this.scene.mouseOverable.push(this.inputText);
+      this.HandleTextInputSetup();
+    }
+
+    this.HandleStencilSetup();
   }
   HandleTextInputSetup(){
     this.scene.inputPrompts.push(this.inputText);
@@ -8407,10 +8414,12 @@ export class InputTextWidget extends BaseWidget {
     let draggable = this.box.userData.properties.draggable;
     const editProps = editTextProperties(this, '', this.inputText, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, draggable, textProps.meshProps);
     this.inputText.userData.textProps = editProps;
-    this.box.userData.mouseOverParent = true;
     this.box.userData.currentText = '';
+    this.box.userData.mouseOverParent = true;
     this.scene.mouseOverable.push(this.box);
     mouseOverUserData(this.inputText);
+  }
+  HandleStencilSetup(){
     if(this.box.userData.properties.isPortal){
       setupStencilMaterial(this.box.material, this.box.material.stencilRef);
       setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
