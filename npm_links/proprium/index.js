@@ -1553,6 +1553,9 @@ export class HVYM_Scene {
     });
   }
   showContextMenu(obj){
+    if(!obj.userData.hasOwnProperty('hvymCtrl'))
+      return;
+
     if(obj.userData.hvymCtrl.enableContextMenus && menu!=undefined){
       const rect = this.renderer.domElement.getBoundingClientRect();
 
@@ -1659,6 +1662,10 @@ export class HVYM_Scene {
       const intersectsContextItem = this.raycaster.intersectObjects(this.contextItems);
 
       if ( intersectsContextItem.length > 0 ) {
+        let obj = intersectsContextItem[0].object;
+
+        console.log(obj)
+
         if(this.contextShowing){
           this.hideContextMenu();
         }
@@ -9613,6 +9620,8 @@ export class HVYM_Action {
         this.currentIndex-=1;
         if(this.currentIndex<0 && this.sequence=='loop'){
           this.currentIndex = this.max;
+        }else if(this.currentIndex<0 && this.sequence=='one_shot'){
+          this.dontPlay = true;
         }
         if(this.lastClip != undefined){
           this.lastClip.stop();
@@ -9634,11 +9643,9 @@ export class HVYM_Action {
         this.currentIndex+=1;
         if(this.currentIndex>=this.max && this.sequence=='loop'){
           this.currentIndex = 0;
+        }else if(this.currentIndex>=this.max && this.sequence=='one_shot'){
+          this.dontPlay = true;
         }
-      }
-
-      if(this.sequence=='one_shot'){
-        this.dontPlay = true;
       }
     }
 
@@ -11029,6 +11036,7 @@ export class GLTFModelWidget extends BaseWidget {
         this.AddMinterButton(); 
       }
     }
+
   }
   UnlockMinterAnimation(){
     this.hvymScene.anims.minterUnlockAnimation(this.minterLock, this.minterLockLoop, this.minterButton, 2.0);
@@ -11108,6 +11116,10 @@ export class GLTFModelWidget extends BaseWidget {
   CreateBasicHVYMPanel(panelPropList){
     panelPropList.forEach((panelProps, index) =>{
       let panel = undefined;
+
+      if(Object.keys(panelProps.sections.data).length==0)
+        return;
+
       if(index == 0){
         panel = new BasePanel(panelProps);
         this.SetHvymDataPropriumPanel(panelProps, panel);
