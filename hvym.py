@@ -28,7 +28,7 @@ from zipfile import ZipFile
 from tinydb import TinyDB, Query
 import xml.etree.ElementTree as ET
 from base64 import b64encode
-from gradientmessagebox import ColorConfig, PresetLoadingMessage, PresetImageBgMessage, PresetFileSelectWindow, PresetPromptWindow, PresetChoiceWindow, PresetDropDownWindow, PresetChoiceEntryWindow, PresetChoiceMultilineEntryWindow, PresetCopyTextWindow, PresetUserPasswordWindow
+from gradientmessagebox import *
 
 ABOUT = """
 Command Line Interface for Heavymeta Standard NFT Data
@@ -2037,6 +2037,8 @@ def icp_deploy_assets(project_type, test):
             folders = [MINTER_TEMPLATE]
       elif project_type == 'custom':
             folders = [CUSTOM_CLIENT_TEMPLATE]
+      elif project_type == 'assets':
+            folders = [ASSETS_CLIENT_TEMPLATE]
         
       return _subprocess('icp', folders, command, BUILDING_IMG)
     
