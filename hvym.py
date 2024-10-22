@@ -1,3 +1,7 @@
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget, QCheckBox, QFormLayout, QSystemTrayIcon, QComboBox, QTextEdit, QLineEdit, QDialogButtonBox, QSpacerItem, QSizePolicy, QMenu, QAction, QStyle, qApp, QVBoxLayout, QPushButton, QDialog, QDesktopWidget, QFileDialog, QMessageBox
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QIcon, QPixmap
+from qtwidgets import PasswordEdit
 import os
 import sys
 import click
@@ -28,7 +32,7 @@ from zipfile import ZipFile
 from tinydb import TinyDB, Query
 import xml.etree.ElementTree as ET
 from base64 import b64encode
-from gradientmessagebox import *
+import pyperclip
 
 ABOUT = """
 Command Line Interface for Heavymeta Standard NFT Data
@@ -62,13 +66,539 @@ LOADING_IMG = os.path.join(FILE_PATH, 'images', 'loading.gif')
 BUILDING_IMG = os.path.join(FILE_PATH, 'images', 'building.gif')
 BG_IMG = os.path.join(FILE_PATH, 'images', 'hvym_3d_logo.png')
 LOGO_IMG = os.path.join(FILE_PATH, 'images', 'logo.png')
+ICP_LOGO_IMG = os.path.join(FILE_PATH, 'images', 'icp_logo.png')
 NPM_LINKS = os.path.join(FILE_PATH, 'npm_links')
 FG_TXT_COLOR = '#98314a'
+
+APP = QApplication(sys.argv)
 
 
 STORAGE = TinyDB(os.path.join(FILE_PATH, 'data', 'db.json'))
 IC_IDS = STORAGE.table('ic_identities')
 IC_PROJECTS = STORAGE.table('ic_projects')
+
+class MsgDialog(QDialog):
+    def __init__(self, msg, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        space = QLabel(' ')
+        layout.addWidget(message)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
+
+class IconMsgBox(QDialog):
+    def __init__(self, msg, icon=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addWidget(img, alignment=Qt.AlignCenter)
+        layout.addWidget(message, alignment=Qt.AlignCenter)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
+
+class ChoiceDialog(QDialog):
+    def __init__(self, msg, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        space = QLabel(' ')
+        layout.addWidget(message)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
+
+class IconChoiceMsgBox(QDialog):
+    def __init__(self, msg, icon=None, parent=None):
+        super().__init__(parent)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addWidget(img, alignment=Qt.AlignCenter)
+        layout.addWidget(message, alignment=Qt.AlignCenter)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
+
+class OptionsDialog(QDialog):
+    def __init__(self, msg, options, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+        self.combobox = QComboBox()
+
+        for option in options:
+              self.combobox.addItem(option)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        space = QLabel(' ')
+        layout.addWidget(message)
+        layout.addWidget(self.combobox)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
+    def value(self):
+          return self.combobox.currentText()
+
+class IconOptionsMsgBox(QDialog):
+    def __init__(self, msg, options, icon=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+        self.combobox = QComboBox()
+
+        for option in options:
+              self.combobox.addItem(option)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addWidget(img, alignment=Qt.AlignCenter)
+             
+        layout.addWidget(message, alignment=Qt.AlignCenter)
+        layout.addWidget(self.combobox)
+        layout.addWidget(space)
+        layout.addWidget(self.buttonBox)
+
+        self.setLayout(layout)
+
+    def value(self):
+          return self.combobox.currentText()
+    
+
+class TextEditDialog(QDialog):
+    def __init__(self, msg, defaultTxt=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        layout.addRow(message)
+        self.text_edit = QTextEdit(self)
+        layout.addRow(self.text_edit)
+        layout.addRow(space)
+        layout.addRow(self.buttonBox)
+
+        if defaultTxt != None:
+              self.text_edit.setPlainText(defaultTxt)
+
+
+class IconEditTextMsgBox(QDialog):
+    def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
+        super().__init__(parent)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addRow(img)
+        layout.addRow(message)
+        self.text_edit = QTextEdit(self)
+        layout.addRow(self.text_edit)
+        layout.addRow(space)
+        layout.addRow(self.buttonBox)
+
+        if defaultTxt != None:
+              self.text_edit.setPlainText(defaultTxt)
+
+    def value(self):
+        return self.text_edit.toPlainText()
+    
+
+class IconCopyTextMsgBox(QDialog):
+    def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
+        super().__init__(parent)
+
+        self.copyBtn = QPushButton("Copy")
+        self.okBtn = QPushButton("OK")
+        self.copyBtn.clicked.connect(self.copy)
+        self.okBtn.clicked.connect(self.close)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addRow(img)
+        layout.addRow(message)
+        self.text_edit = QTextEdit(self)
+        layout.addRow(self.text_edit)
+        layout.addRow(space)
+        layout.addRow(self.copyBtn)
+        layout.addRow(self.okBtn)
+
+        if defaultTxt != None:
+              self.text_edit.setPlainText(defaultTxt)
+
+    def value(self):
+        return self.text_edit.toPlainText()
+    
+    def copy(self):
+         pyperclip.copy(self.text_edit.toPlainText())
+    
+
+class IconPasswordTextMsgBox(QDialog):
+    def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        self.acct_lbl = QLabel("Account")
+        self.pw_lbl = QLabel("Password")
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addRow(img)
+        layout.addRow(message)
+        self.acct = QLineEdit(self)
+        self.pw = PasswordEdit(self)
+        layout.addRow(self.acct_lbl)
+        layout.addRow(self.acct)
+        layout.addRow(self.pw_lbl)
+        layout.addRow(self.pw)
+        layout.addRow(space)
+        layout.addRow(self.buttonBox)
+
+        if defaultTxt != None:
+              self.acct.setText(defaultTxt)
+
+    def value(self):
+        return {'user': self.acct.text(), 'pw': self.pw.text()}
+    
+
+class LineEditDialog(QDialog):
+    def __init__(self, msg, defaultTxt=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        layout.addRow(message)
+        self.text_edit = QLineEdit(self)
+        layout.addRow(self.text_edit)
+        layout.addRow(self.buttonBox)
+
+        if defaultTxt != None:
+              self.text_edit.setText(defaultTxt)
+
+    def value(self):
+         return self.edit_text.text()
+
+
+class IconLineEditMsgBox(QDialog):
+    def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
+        super().__init__(parent)
+
+        #self.setWindowTitle("HELLO!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addWidget(img, alignment=Qt.AlignCenter)
+        layout.addRow(message, alignment=Qt.AlignCenter)
+        self.text_edit = QLineEdit(self)
+        layout.addRow(self.text_edit)
+        layout.addRow(self.buttonBox)
+
+        if defaultTxt != None:
+              self.text_edit.setText(defaultTxt)
+
+    def value(self):
+        return self.edit_text.text()
+    
+class FileDialog(QFileDialog):
+    def __init__(self, msg, filterTypes=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(msg)
+        self.setDirectory(HOME)
+        self.setFileMode(QFileDialog.AnyFile)
+        if filterTypes != None:
+            self.setNameFilters(filterTypes)
+
+    def value(self):
+         return self.selectedFiles()
+
+class HVYMMainWindow(QMainWindow):
+    """
+         App for user input
+    """
+    def __init__(self):
+      QMainWindow.__init__(self)
+      self.FILE_PATH = Path(__file__).parent
+      self.HVYM_IMG = os.path.join(self.FILE_PATH, 'images', 'hvym_3d_logo.png')
+      self.LOGO_IMG = os.path.join(self.FILE_PATH, 'images', 'logo.png')
+      self.STYLE_SHEET = os.path.join(self.FILE_PATH, 'data', 'style.qss')
+      self.value = None
+      self.setMinimumSize(QSize(80, 80))  # Set sizes
+      self.setWindowTitle("System Tray Application")  # Set a title
+      # Create a central widget
+      central_widget = QWidget(self)
+      # Set the central widget
+      self.setCentralWidget(central_widget)
+      #self.setWindowIcon(self.win_icon)          # Set the icon
+      label = QLabel("", self)
+      label.setPixmap(QPixmap(self.LOGO_IMG))
+      label.adjustSize()
+
+      self.setWindowFlag(Qt.FramelessWindowHint)
+      self.setStyleSheet(Path(str(self.STYLE_SHEET)).read_text())
+      self._center()
+      self.hide()
+
+    def _center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+    def Close(self):
+          self.close()
+   
+    def MessagePopup(self, message):
+      #     self.show()
+          popup = MsgDialog(message, self)
+          popup.exec()
+          self.close()
+
+    def IconMessagePopup(self, message, icon):
+          popup = IconMsgBox(message, icon, self)
+          popup.exec()
+          self.close()
+
+    def ChoicePopup(self, message):
+          result = 'CANCEL'
+
+          popup = ChoiceDialog(message, self)
+          if popup.exec():
+                result = 'OK'
+          self.value = result
+          self.close()
+
+          return result
+
+    def IconChoicePopup(self, message, icon):
+          result = 'CANCEL'
+          popup = IconChoiceMsgBox(message, self, icon, self)
+          if popup.exec():
+                result = 'OK'
+          self.value = result
+          self.close()
+
+          return result
+
+    def OptionsPopup(self, message, options):
+          result = None
+          popup = OptionsDialog(message, options, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+    
+    def IconOptionsPopup(self, message, options, icon):
+          result = None
+          popup = IconOptionsMsgBox(message, options, icon, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+    
+    def EditTextPopup(self, message, defaultText=None):
+          result = None
+          popup = TextEditDialog(message, defaultText, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+    
+    def IconEditTextPopup(self, message, defaultText=None, icon=None):
+          result = None
+          popup = IconEditTextMsgBox(message, defaultText, icon, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+
+    def IconCopyTextPopup(self, message, defaultText=None, icon=None):
+          result = None
+          popup = IconCopyTextMsgBox(message, defaultText, icon, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+    
+    def EditLinePopup(self, message, defaultText=None):
+          result = None
+          popup = LineEditDialog(message, defaultText, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+    
+    def IconEditLinePopup(self, message, defaultText=None, icon=None):
+          result = None
+          popup = IconLineEditMsgBox(message, defaultText, icon, self)
+          if popup.exec():
+                result = popup.value()
+          self.value = result
+          self.close()
+
+          return result
+
+    def IconPasswordPopup(self, message, defaultText=None, icon=None):
+         result = None
+         popup = IconPasswordTextMsgBox(message, defaultText, icon, self)
+         if popup.exec():
+                result = popup.value()
+         self.value = result
+         self.close()
+
+         return result
+    
+    def FilePopup(self, msg, filters=None):
+         result = None
+         popup = FileDialog(msg, filters, self)
+         if popup.exec():
+              result = popup.value()
+         self.value = result
+         self.close()
+
+         return result
+
 
 
 #Material Data classes
@@ -1186,7 +1716,6 @@ def _ic_assets_client_path():
 def _ic_minter_model_path():
       return os.path.join(_ic_minter_path(), 'src', 'proprium_minter_frontend', 'assets')
 
-
 def _npm_install(path, loading=None):
       try:
             _subprocess_output('npm install', path) 
@@ -2006,8 +2535,7 @@ def icp_balance():
 @click.argument('project_type')
 def icp_start_assets(project_type): 
       """Start dfx in the current assets folder."""
-      loading = PresetLoadingMessage('STARTING DFX DAEMON')
-      _config_popup(loading)
+      loading = loading = GifAnimation(str(LOADING_IMG), 1000, True, 'STARTING DFX DAEMON')
       loading.Play()
       _set_hvym_network()
       if project_type == 'model':
@@ -2020,7 +2548,7 @@ def icp_start_assets(project_type):
             _ic_start_daemon(ASSETS_CLIENT_TEMPLATE)
 
       time.sleep(2)
-      loading.Close()
+      loading.Stop()
                 
 
 @click.command('icp-stop-assets')
@@ -2179,13 +2707,9 @@ def icp_set_account(quiet):
 
 
 @click.command('icp-new-account')
-@click.option('--encrypted', '-e', is_flag=True, default=True, help="If false, account is unencrypted.")
-def icp_new_account(encrypted):
+def icp_new_account():
       """Create a new icp account"""
-      if encrypted:
-            click.echo(_ic_new_encrypted_account_popup())
-      else:
-            click.echo(_ic_new_account_popup())
+      click.echo(_ic_new_encrypted_account_popup())
 
 
 @click.command('img-to-url')
@@ -2301,7 +2825,6 @@ def icp_debug_model_minter(model):
       print(model)
       loading = GifAnimation(LOADING_IMG, 1000, True, '', True)
       loading.Play()
-      print(loading)
 
       if '.glb' not in model:
         click.echo(f"Only GLTF Binary files (.glb) accepted.")
@@ -2440,12 +2963,10 @@ def up():
 @click.argument('msg', type=str)
 def custom_loading_msg(msg):
       """ Show custom loading message based on passed msg arg."""
-      loading = PresetLoadingMessage(msg=msg)
-      _config_popup(loading)
-      #loading.custom_txt_color(FG_TXT_COLOR)
+      loading = GifAnimation(str(LOADING_IMG), 1000, True, msg)
       loading.Play()
       time.sleep(5)
-      loading.Close()
+      loading.Stop()
 
 
 @click.command('custom-prompt')
@@ -2459,7 +2980,7 @@ def custom_prompt(msg):
 @click.argument('msg', type=str)
 def custom_prompt_wide(msg):
       """ Show custom wide prompt based on passed text."""
-      _prompt_popup(f'{msg}', True)
+      _prompt_popup(f'{msg}')
 
 
 @click.command('custom-choice-prompt')
@@ -2477,8 +2998,7 @@ def splash():
 @click.command('test')
 def test():
       """Set up nft collection deploy directories"""
-      _ic_new_account_popup()
-      #_ic_account_dropdown_popup()
+      _ic_account_dropdown_popup()
 
 
 @click.command('print-hvym-data')
@@ -2509,97 +3029,103 @@ def about():
 
 
 '''popup creation methods:'''
-
-def _config_popup(popup):
-      popup.fg_luminance(0.8)
-      popup.bg_saturation(0.6)
-      popup.bg_luminance(0.4)
-      popup.custom_msg_color(FG_TXT_COLOR)
-
 def _splash(text):
-      splash = PresetImageBgMessage(msg=text, bg_img=BG_IMG, logo_img=LOGO_IMG)
+      splash = GifAnimation(str(LOGO_IMG), 1000, True, text)
       splash.Play()
       time.sleep(5)
       splash.Close()
 
-def _choice_popup(msg):
-      """ Show choice popup, message based on passed msg arg."""
-      popup = PresetChoiceWindow(msg)
-      _config_popup(popup)
-      result = popup.Ask()
-      return result.response
+def _spawn_main():
+      main = HVYMMainWindow()
+      return {'main': main, 'popup': None}
 
+def _msg_popup(msg, icon=None):
+      app_data = _spawn_main()
+      if icon == None:
+           app_data['popup'] = app_data['main'].MessagePopup(msg)
+      else:
+           app_data['popup'] = app_data['main'].IconMessagePopup(msg, icon)
+      return app_data
 
-def _prompt_popup(msg, wide=False):
+def _options_popup(msg, options,icon=None):
+      app_data = _spawn_main()
+      if icon == None:
+           app_data['popup'] = app_data['main'].OptionsPopup(msg, options)
+      else:
+           app_data['popup'] = app_data['main'].IconOptionsPopup(msg, options, icon)
+      
+      return app_data 
+
+def _edit_line_popup(msg, options, defaultText=None, icon=None):
+      app_data = _spawn_main()
+      if icon == None:
+           app_data['popup'] = app_data['main'].EditLinePopup(msg, options, defaultText)
+      else:
+           app_data['popup'] = app_data['main'].IconEditLinePopup(msg, options, defaultText, icon)
+      
+      return app_data 
+
+def _password_popup(msg, defaultText=None, icon=str(LOGO_IMG)):
+      app_data = _spawn_main()
+      app_data['popup'] = app_data['main'].IconPasswordPopup(msg, defaultText, icon)
+      return app_data 
+
+def _copy_text_popup(msg, defaultText=None, icon=str(LOGO_IMG)):
+      app_data = _spawn_main()
+      app_data['popup'] = app_data['main'].IconCopyTextPopup(msg, defaultText, icon)
+      return app_data 
+
+def _choice_popup(msg, icon=None):
       """ Show choice popup, message based on passed msg arg."""
-      popup = PresetPromptWindow(msg)
-      if wide:
-            popup = PresetWidePromptWindow(msg)
-            
-      _config_popup(popup)
-      popup.Prompt()
+      app_data = _spawn_main()
+      if icon == None:
+           app_data['popup'] = app_data['main'].ChoicePopup(msg)
+      else:
+           app_data['popup'] = app_data['main'].IconChoicePopup(msg, icon)
+      
+      return app_data['main'].value
+
+def _prompt_popup(msg):
+      """ Show choice popup, message based on passed msg arg."""
+      _msg_popup(msg)
+
+def _file_select_popup(msg, filters=None, icon=str(LOGO_IMG)):
+      app_data = _spawn_main()
+      app_data['popup'] = app_data['main'].FilePopup(msg, filters)
+      return app_data 
 
 def _prompt_img_convert_to_url(msg):
       """ Show file selection popup, then convert selected file to base64 string."""
-      popup = PresetFileSelectWindow(msg)
-      popup.set_file_select_types([("SVG Files", "*.svg"), ("PNG Files", "*.png")])
+      app = _file_select_popup(msg, ["Images (*.png *.svg)"])
+      if not app:
+            return
+      if app['main'].value == None or len(app['main'].value)==0:
+           return
+      
       result = None
-      _config_popup(popup)
-      file = popup.FileSelect()
-      if os.path.isfile(file.response):
-            if '.png' in file.response:
-                  result = _png_to_data_url(file.response)
-            elif '.svg' in file.response:
-                  result = _svg_to_data_url(file.response)
+      file = app['main'].value[0]
+
+      if os.path.isfile(file):
+            if '.png' in file:
+                  result = _png_to_data_url(file)
+            elif '.svg' in file:
+                  result = _svg_to_data_url(file)
 
       return result
+
 
 def _ic_account_dropdown_popup(confirmation=True):
       _ic_update_data()
       data = _ic_id_info()
       text = '''Choose Account:'''
-      popup = PresetDropDownWindow(text,'OK')
-      _config_popup(popup)
-      select = popup.DropDown(data['list'])
-      confirm = f'''Account has been 
-changed to:
-            '''
+      app = _options_popup(text, data['list'], str(ICP_LOGO_IMG))
+      select = app['main'].value
 
-      if select.response != None and select.response != data['active_id']:
-            _ic_set_id(select.response)
+      if select != None and select != data['active_id']:
+            _ic_set_id(select)
             data = _ic_id_info()
             if confirmation:
-                  confirm += select.response
-                  popup = PresetPromptWindow(confirm)
-                  _config_popup(popup)
-                  popup.Prompt()
-
-      return data['active_id']
-
-
-def _ic_new_account_popup():
-      find = Query()
-      data = IC_IDS.get(find.data_type == 'IC_ID_INFO')
-      text = '''Enter a name for the new account:
-      '''
-      popup = PresetChoiceEntryWindow(text,'OK')
-      _config_popup(popup)
-      answer = popup.Ask()
-
-      if answer.response != None and answer.response != '' and answer.response != 'CANCEL':
-            if answer.response not in data['list']:
-                  dfx = _ic_new_id(answer.response)
-                  _ic_set_id(answer.response)
-                  arr1 = dfx.split('\n')
-                  arr2 = arr1[0].split(':')
-                  text = arr2[0].strip()+'''\nMake sure to store it in a secure place.
-                  '''
-                  seed = arr2[1]
-                  popup = PresetCopyTextWindow(text, 'COPY', 'DONE')
-                  _config_popup(popup)
-                  popup.default_entry_text(seed)
-                  popup.Ask()
-                  _ic_update_data()
+                  _msg_popup(f'Account has been changed to: {select}', str(ICP_LOGO_IMG))
 
       return data['active_id']
 
@@ -2607,27 +3133,35 @@ def _ic_new_account_popup():
 def _ic_new_encrypted_account_popup():
       find = Query()
       data = IC_IDS.get(find.data_type == 'IC_ID_INFO')
-      text = '''Enter a name for the new account:
-      '''
-      popup = PresetUserPasswordWindow(text)
-      _config_popup(popup)
-      answer = popup.Ask()
+      text = 'Enter a name for the new account:'
+      app = _password_popup(text, str(ICP_LOGO_IMG))
 
-      if answer.response != None and answer.response != '' and answer.response != 'CANCEL':
-            if answer.response not in data['list']:
-                  dfx = _ic_new_encrypted_id(answer.response['user'], answer.response['pw'])
-                  _ic_set_id(answer.response['user'])
+      if not app:
+            return
+      
+      answer = app['main'].value
+
+      if len(answer['user']) == 0 or len(answer['pw']) == 0:
+           _msg_popup('All fields must be filled in.', str(ICP_LOGO_IMG))
+           return
+           
+      if answer != None and answer != '' and answer != 'CANCEL':
+            user = answer['user']
+            pw = answer['pw']
+            if user not in data['list']:
+                  dfx = _ic_new_encrypted_id(user, pw)
+                  _ic_set_id(user)
                   arr1 = dfx.split('\n')
-                  arr2 = arr1[0].split(':')
                   arr3 = arr1[3].split(':')
                   text = arr3[0].strip()+'''\nMake sure to store it in a secure place.
                   '''
                   seed = arr3[1].strip()
-                  popup = PresetCopyTextWindow(text, 'COPY', 'DONE')
-                  _config_popup(popup)
-                  popup.default_entry_text(seed)
-                  popup.Ask()
+                  _copy_text_popup(text, seed, str(ICP_LOGO_IMG))
                   _ic_update_data()
+                  _msg_popup(f'New account has been created and changed to: {user}', str(ICP_LOGO_IMG))
+            elif user in data['list']:
+                 _msg_popup(f'{user} exists already, try a different account name.', str(ICP_LOGO_IMG))
+                 _ic_new_encrypted_account_popup()
 
       return data['active_id']
 
