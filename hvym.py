@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget, QCheckBox, QFormLayout, QSystemTrayIcon, QComboBox, QTextEdit, QLineEdit, QDialogButtonBox, QSpacerItem, QSizePolicy, QMenu, QAction, QStyle, qApp, QVBoxLayout, QPushButton, QDialog, QDesktopWidget, QFileDialog, QMessageBox
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtWidgets import QApplication, QMainWindow, QSplashScreen, QLabel, QGridLayout, QWidget, QCheckBox, QFormLayout, QSystemTrayIcon, QComboBox, QTextEdit, QLineEdit, QDialogButtonBox, QSpacerItem, QSizePolicy, QMenu, QAction, QStyle, qApp, QVBoxLayout, QPushButton, QDialog, QDesktopWidget, QFileDialog, QMessageBox
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QPixmap
 from qtwidgets import PasswordEdit
 import os
@@ -34,10 +34,12 @@ import xml.etree.ElementTree as ET
 from base64 import b64encode
 import pyperclip
 
-ABOUT = """
-Command Line Interface for Heavymeta Standard NFT Data
-By: Fibo Metavinci
-All Rights Reserved
+BRAND = "HEAVYMETA®"
+VERSION = "0.01"
+ABOUT = f"""
+Command Line Interface for {BRAND} Standard NFT Data
+Version: {VERSION}
+ALL RIGHTS RESERVED 2024
 """
 VERSION = "0.01"
 
@@ -80,7 +82,7 @@ IC_PROJECTS = STORAGE.table('ic_projects')
 class MsgDialog(QDialog):
     def __init__(self, msg, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok
 
@@ -99,7 +101,7 @@ class MsgDialog(QDialog):
 class IconMsgBox(QDialog):
     def __init__(self, msg, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok
 
@@ -124,7 +126,7 @@ class IconMsgBox(QDialog):
 class ChoiceDialog(QDialog):
     def __init__(self, msg, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -144,7 +146,7 @@ class ChoiceDialog(QDialog):
 class IconChoiceMsgBox(QDialog):
     def __init__(self, msg, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -169,7 +171,7 @@ class IconChoiceMsgBox(QDialog):
 class OptionsDialog(QDialog):
     def __init__(self, msg, options, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
         self.combobox = QComboBox()
 
         for option in options:
@@ -196,7 +198,7 @@ class OptionsDialog(QDialog):
 class IconOptionsMsgBox(QDialog):
     def __init__(self, msg, options, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         self.combobox = QComboBox()
 
@@ -233,7 +235,7 @@ class IconOptionsMsgBox(QDialog):
 class TextEditDialog(QDialog):
     def __init__(self, msg, defaultTxt=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -257,7 +259,7 @@ class TextEditDialog(QDialog):
 class IconEditTextMsgBox(QDialog):
     def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -291,7 +293,7 @@ class IconEditTextMsgBox(QDialog):
 class IconCopyTextMsgBox(QDialog):
     def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         self.copyBtn = QPushButton("Copy")
         self.okBtn = QPushButton("OK")
@@ -328,7 +330,7 @@ class IconCopyTextMsgBox(QDialog):
 class IconPasswordTextMsgBox(QDialog):
     def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -368,7 +370,7 @@ class IconPasswordTextMsgBox(QDialog):
 class LineEditDialog(QDialog):
     def __init__(self, msg, defaultTxt=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -394,7 +396,7 @@ class LineEditDialog(QDialog):
 class IconLineEditMsgBox(QDialog):
     def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Heavymeta®")
+        self.setWindowTitle(BRAND)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -434,6 +436,7 @@ class FileDialog(QFileDialog):
 
     def value(self):
          return self.selectedFiles()
+   
 
 class HVYMMainWindow(QMainWindow):
     """
@@ -473,9 +476,20 @@ class HVYMMainWindow(QMainWindow):
 
     def Close(self):
           self.close()
+
+    def splashScreen(self, message=None, duration = 3000):
+      splash_pix = QPixmap( str(self.HVYM_IMG) )
+      splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+      if message is not None:
+            align = Qt.Alignment(Qt.AlignBottom |
+                                    Qt.AlignRight |
+                                    Qt.AlignAbsolute)
+            splash.showMessage(message, align)
+      splash.show()
+      QTimer.singleShot(duration, APP.quit)
+      sys.exit(APP.exec_())
    
     def MessagePopup(self, message):
-      #     self.show()
           popup = MsgDialog(message, self)
           popup.exec()
           self.close()
@@ -487,7 +501,6 @@ class HVYMMainWindow(QMainWindow):
 
     def ChoicePopup(self, message):
           result = 'CANCEL'
-
           popup = ChoiceDialog(message, self)
           if popup.exec():
                 result = 'OK'
@@ -498,7 +511,7 @@ class HVYMMainWindow(QMainWindow):
 
     def IconChoicePopup(self, message, icon):
           result = 'CANCEL'
-          popup = IconChoiceMsgBox(message, self, icon, self)
+          popup = IconChoiceMsgBox(message, icon, self)
           if popup.exec():
                 result = 'OK'
           self.value = result
@@ -595,6 +608,7 @@ class HVYMMainWindow(QMainWindow):
          self.close()
 
          return result
+        
 
 class HVYMInteraction(HVYMMainWindow):
     """
@@ -605,19 +619,28 @@ class HVYMInteraction(HVYMMainWindow):
       self.call = None
       self.value = None
 
-    def msg_popup(self, msg, icon=None):
+    def splash(self, msg, duration = 3000):
+      self.splashScreen(msg, duration)
+
+    def msg_popup(self, msg, icon=str(LOGO_IMG)):
       if icon == None:
            self.call = self.MessagePopup(msg)
       else:
            self.call = self.IconMessagePopup(msg, icon)
 
-    def options_popup(self, msg, options,icon=None):
+    def choice_popup(self, msg, icon=str(LOGO_IMG)):
+      if icon == None:
+           self.call = self.ChoicePopup(msg)
+      else:
+           self.call = self.IconChoicePopup(msg, icon)
+
+    def options_popup(self, msg, options, icon=str(LOGO_IMG)):
       if icon == None:
            self.call = self.OptionsPopup(msg, options)
       else:
            self.call = self.IconOptionsPopup(msg, options, icon)
       
-    def edit_line_popup(self, msg, options, defaultText=None, icon=None):
+    def edit_line_popup(self, msg, options, defaultText=None, icon=str(LOGO_IMG)):
       if icon == None:
            self.call = self.EditLinePopup(msg, options, defaultText)
       else:
@@ -628,12 +651,6 @@ class HVYMInteraction(HVYMMainWindow):
 
     def copy_text_popup(self, msg, defaultText=None, icon=str(LOGO_IMG)):
       self.call = self.IconCopyTextPopup(msg, defaultText, icon) 
-
-    def _choice_popup(self, msg, icon=None):
-      if icon == None:
-           self.call = self.ChoicePopup(msg)
-      else:
-           self.call = self.IconChoicePopup(msg, icon)
 
     def file_select_popup(self, msg, filters=None, icon=str(LOGO_IMG)):
       self.call = self.FilePopup(msg, filters)
@@ -2782,7 +2799,7 @@ def icp_init(project_type, force, quiet):
                   loading.Play()
                   _ic_install_model_debug_repo(model_path)
             else:
-                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  answer = _choice_popup('Project exists already, n/ Overwrite?').value
                   if answer == 'OK':
                         _ic_install_model_debug_repo(model_path)
 
@@ -2792,7 +2809,7 @@ def icp_init(project_type, force, quiet):
                   loading.Play()
                   _ic_install_model_minter_repo(minter_path)
             else:
-                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  answer = _choice_popup('Project exists already, n/ Overwrite?').value
                   if answer == 'OK':
                         _ic_install_model_minter_repo(minter_path)
 
@@ -2802,7 +2819,7 @@ def icp_init(project_type, force, quiet):
                   loading.Play()
                   _ic_install_custom_client_repo(custom_client_path)
             else:
-                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  answer = _choice_popup('Project exists already, n/ Overwrite?').value
                   if answer == 'OK':
                         _ic_install_custom_client_repo(custom_client_path)
 
@@ -2812,7 +2829,7 @@ def icp_init(project_type, force, quiet):
                   loading.Play()
                   _ic_install_assets_client_repo(assets_client_path)
             else:
-                  answer = _choice_popup('Project exists already, n/ Overwrite?')
+                  answer = _choice_popup('Project exists already, n/ Overwrite?').value
                   if answer == 'OK':
                         _ic_install_assets_client_repo(assets_client_path)
 
@@ -2996,7 +3013,7 @@ def up():
       loading.Play()
       _link_hvym_npm_modules()
       loading.Stop()
-      _splash('HEAVYMETA')
+      _splash(BRAND)
 
 @click.command('custom-loading-msg')
 @click.argument('msg', type=str)
@@ -3025,13 +3042,13 @@ def custom_prompt_wide(msg):
 @click.command('custom-choice-prompt')
 @click.argument('msg', type=str)
 def custom_choice_prompt(msg):
-      click.echo(_choice_popup(f'{msg}'))
+      click.echo(_choice_popup(f'{msg}').value)
 
 
 @click.command('splash')
 def splash():
       """Show Heavymeta Splash"""
-      _splash('HEAVYMETA')
+      _splash(BRAND)
 
 
 @click.command('test')
@@ -3069,14 +3086,8 @@ def about():
 
 '''popup creation methods:'''
 def _splash(text):
-      splash = GifAnimation(str(LOGO_IMG), 1000, True, text)
-      splash.Play()
-      time.sleep(5)
-      splash.Close()
-
-def _spawn_main():
-      main = HVYMMainWindow()
-      return {'main': main, 'popup': None}
+      interaction = HVYMInteraction()
+      interaction.splash(text)
 
 def _msg_popup(msg, icon=None):
       interaction = HVYMInteraction()
@@ -3106,7 +3117,7 @@ def _copy_text_popup(msg, defaultText=None, icon=str(LOGO_IMG)):
 
       return interaction
 
-def _choice_popup(msg, icon=None):
+def _choice_popup(msg, icon=str(LOGO_IMG)):
       """ Show choice popup, message based on passed msg arg."""
       interaction = HVYMInteraction()
       interaction.choice_popup(msg, icon)
