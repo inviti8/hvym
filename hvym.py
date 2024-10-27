@@ -33,6 +33,8 @@ from tinydb import TinyDB, Query
 import xml.etree.ElementTree as ET
 from base64 import b64encode
 import pyperclip
+import copy
+import json
 
 BRAND = "HEAVYMETA®"
 VERSION = "0.01"
@@ -45,6 +47,7 @@ VERSION = "0.01"
 
 FILE_PATH = Path(__file__).parent
 HOME = os.path.expanduser('~')
+CLI_PATH = os.path.join(HOME, '.local', 'share', 'meavymeta-cli')
 DFX = os.path.join(HOME, '.local', 'share', 'dfx', 'bin', 'dfx')
 
 TEMPLATE_MODEL_VIEWER_INDEX = 'model_viewer_html_template.txt'
@@ -66,18 +69,28 @@ CUSTOM_CLIENT_TEMPLATE = 'hvym_custom_client_template-main'
 ASSETS_CLIENT_TEMPLATE = 'hvym_assets_template-master'
 LOADING_IMG = os.path.join(FILE_PATH, 'images', 'loading.gif')
 BUILDING_IMG = os.path.join(FILE_PATH, 'images', 'building.gif')
-BG_IMG = os.path.join(FILE_PATH, 'images', 'hvym_3d_logo.png')
+BG_IMG = os.path.join(FILE_PATH, 'images', 'hvym.png')
 LOGO_IMG = os.path.join(FILE_PATH, 'images', 'logo.png')
+LOGO_WARN_IMG = os.path.join(FILE_PATH, 'images', 'logo_warn.png')
+LOGO_CHOICE_IMG = os.path.join(FILE_PATH, 'images', 'logo_choice.png')
 ICP_LOGO_IMG = os.path.join(FILE_PATH, 'images', 'icp_logo.png')
 NPM_LINKS = os.path.join(FILE_PATH, 'npm_links')
+DATA_PATH = os.path.join(FILE_PATH, 'data')
 FG_TXT_COLOR = '#98314a'
 
-APP = QApplication(sys.argv)
+# STORAGE = TinyDB(os.path.join(FILE_PATH, 'data', 'db.json'))#TEST
+dirs = PlatformDirs('heavymeta-cli', 'HeavyMeta')
+STORAGE_PATH = os.path.join(dirs.user_data_dir, 'db.json')
+if not os.path.isfile(STORAGE_PATH):
+      src = os.path.join(DATA_PATH, 'db.json')
+      dst = os.path.join(dirs.user_data_dir, 'db.json')
+      shutil.copyfile(src, dst)
 
-
-STORAGE = TinyDB(os.path.join(FILE_PATH, 'data', 'db.json'))
+STORAGE = TinyDB(STORAGE_PATH)
 IC_IDS = STORAGE.table('ic_identities')
 IC_PROJECTS = STORAGE.table('ic_projects')
+
+APP = None
 
 class MsgDialog(QDialog):
     def __init__(self, msg, parent=None):
@@ -116,8 +129,8 @@ class IconMsgBox(QDialog):
             img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
         space = QLabel(' ')
         if img:
-             layout.addWidget(img, alignment=Qt.AlignCenter)
-        layout.addWidget(message, alignment=Qt.AlignCenter)
+             layout.addWidget(img, alignment=Qt.AlignLeft)
+        layout.addWidget(message, alignment=Qt.AlignLeft)
         layout.addWidget(space)
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
@@ -161,8 +174,8 @@ class IconChoiceMsgBox(QDialog):
             img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
         space = QLabel(' ')
         if img:
-             layout.addWidget(img, alignment=Qt.AlignCenter)
-        layout.addWidget(message, alignment=Qt.AlignCenter)
+             layout.addWidget(img, alignment=Qt.AlignLeft)
+        layout.addWidget(message, alignment=Qt.AlignLeft)
         layout.addWidget(space)
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
@@ -219,9 +232,9 @@ class IconOptionsMsgBox(QDialog):
             img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
         space = QLabel(' ')
         if img:
-             layout.addWidget(img, alignment=Qt.AlignCenter)
+             layout.addWidget(img, alignment=Qt.AlignLeft)
              
-        layout.addWidget(message, alignment=Qt.AlignCenter)
+        layout.addWidget(message, alignment=Qt.AlignLeft)
         layout.addWidget(self.combobox)
         layout.addWidget(space)
         layout.addWidget(self.buttonBox)
@@ -325,9 +338,76 @@ class IconCopyTextMsgBox(QDialog):
     
     def copy(self):
          pyperclip.copy(self.text_edit.toPlainText())
-    
+
+
+class IconUserTextMsgBox(QDialog):
+    def __init__(self, msg, icon=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(BRAND)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        self.acct_lbl = QLabel("Account")
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addRow(img)
+        layout.addRow(message)
+        self.acct = QLineEdit(self)
+        self.pw = PasswordEdit(self)
+        layout.addRow(self.acct_lbl)
+        layout.addRow(self.acct)
+        layout.addRow(space)
+        layout.addRow(self.buttonBox)
+
+    def value(self):
+        return self.acct.text()
+
 
 class IconPasswordTextMsgBox(QDialog):
+    def __init__(self, msg, icon=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(BRAND)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+        message = QLabel(msg)
+        self.pw_lbl = QLabel("Password")
+        img = None
+        if icon != None:
+            img = QLabel()
+            img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
+        space = QLabel(' ')
+        if img:
+             layout.addRow(img)
+        layout.addRow(message)
+        self.pw = PasswordEdit(self)
+        layout.addRow(self.pw_lbl)
+        layout.addRow(self.pw)
+        layout.addRow(space)
+        layout.addRow(self.buttonBox)
+
+    def value(self):
+        return self.pw.text()
+    
+
+class IconUserPasswordTextMsgBox(QDialog):
     def __init__(self, msg, defaultTxt=None, icon=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(BRAND)
@@ -413,8 +493,8 @@ class IconLineEditMsgBox(QDialog):
             img.setPixmap(QPixmap(icon).scaledToHeight(32, Qt.SmoothTransformation))
         space = QLabel(' ')
         if img:
-             layout.addWidget(img, alignment=Qt.AlignCenter)
-        layout.addRow(message, alignment=Qt.AlignCenter)
+             layout.addWidget(img, alignment=Qt.AlignLeft)
+        layout.addRow(message, alignment=Qt.AlignLeft)
         self.text_edit = QLineEdit(self)
         layout.addRow(self.text_edit)
         layout.addRow(self.buttonBox)
@@ -448,8 +528,9 @@ class HVYMMainWindow(QMainWindow):
     def __init__(self):
       QMainWindow.__init__(self)
       self.FILE_PATH = Path(__file__).parent
-      self.HVYM_IMG = os.path.join(self.FILE_PATH, 'images', 'hvym_3d_logo.png')
+      self.HVYM_IMG = os.path.join(self.FILE_PATH, 'images', 'hvym.png')
       self.LOGO_IMG = os.path.join(self.FILE_PATH, 'images', 'logo.png')
+      self.WIN_ICON = QIcon(self.HVYM_IMG)
       self.STYLE_SHEET = os.path.join(self.FILE_PATH, 'data', 'style.qss')
       self.value = None
       self.setMinimumSize(QSize(80, 80))  # Set sizes
@@ -458,11 +539,11 @@ class HVYMMainWindow(QMainWindow):
       central_widget = QWidget(self)
       # Set the central widget
       self.setCentralWidget(central_widget)
-      #self.setWindowIcon(self.win_icon)          # Set the icon
       label = QLabel("", self)
       label.setPixmap(QPixmap(self.LOGO_IMG))
       label.adjustSize()
 
+      self.setWindowIcon(self.WIN_ICON)
       self.setWindowFlag(Qt.FramelessWindowHint)
       self.setStyleSheet(Path(str(self.STYLE_SHEET)).read_text())
       self._center()
@@ -491,17 +572,20 @@ class HVYMMainWindow(QMainWindow):
    
     def MessagePopup(self, message):
           popup = MsgDialog(message, self)
+          popup.setWindowIcon(self.WIN_ICON)
           popup.exec()
           self.close()
 
     def IconMessagePopup(self, message, icon):
           popup = IconMsgBox(message, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           popup.exec()
           self.close()
 
     def ChoicePopup(self, message):
           result = 'CANCEL'
           popup = ChoiceDialog(message, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = 'OK'
           self.value = result
@@ -512,6 +596,7 @@ class HVYMMainWindow(QMainWindow):
     def IconChoicePopup(self, message, icon):
           result = 'CANCEL'
           popup = IconChoiceMsgBox(message, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = 'OK'
           self.value = result
@@ -522,6 +607,7 @@ class HVYMMainWindow(QMainWindow):
     def OptionsPopup(self, message, options):
           result = None
           popup = OptionsDialog(message, options, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -532,6 +618,7 @@ class HVYMMainWindow(QMainWindow):
     def IconOptionsPopup(self, message, options, icon):
           result = None
           popup = IconOptionsMsgBox(message, options, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -542,6 +629,7 @@ class HVYMMainWindow(QMainWindow):
     def EditTextPopup(self, message, defaultText=None):
           result = None
           popup = TextEditDialog(message, defaultText, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -552,6 +640,7 @@ class HVYMMainWindow(QMainWindow):
     def IconEditTextPopup(self, message, defaultText=None, icon=None):
           result = None
           popup = IconEditTextMsgBox(message, defaultText, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -562,6 +651,7 @@ class HVYMMainWindow(QMainWindow):
     def IconCopyTextPopup(self, message, defaultText=None, icon=None):
           result = None
           popup = IconCopyTextMsgBox(message, defaultText, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -572,6 +662,7 @@ class HVYMMainWindow(QMainWindow):
     def EditLinePopup(self, message, defaultText=None):
           result = None
           popup = LineEditDialog(message, defaultText, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -582,6 +673,7 @@ class HVYMMainWindow(QMainWindow):
     def IconEditLinePopup(self, message, defaultText=None, icon=None):
           result = None
           popup = IconLineEditMsgBox(message, defaultText, icon, self)
+          popup.setWindowIcon(self.WIN_ICON)
           if popup.exec():
                 result = popup.value()
           self.value = result
@@ -589,9 +681,32 @@ class HVYMMainWindow(QMainWindow):
 
           return result
 
-    def IconPasswordPopup(self, message, defaultText=None, icon=None):
+    def IconUserPopup(self, message, icon=None):
          result = None
-         popup = IconPasswordTextMsgBox(message, defaultText, icon, self)
+         popup = IconUserTextMsgBox(message, icon, self)
+         popup.setWindowIcon(self.WIN_ICON)
+         if popup.exec():
+                result = popup.value()
+         self.value = result
+         self.close()
+
+         return result
+
+    def IconPasswordPopup(self, message, icon=None):
+         result = None
+         popup = IconPasswordTextMsgBox(message, icon, self)
+         popup.setWindowIcon(self.WIN_ICON)
+         if popup.exec():
+                result = popup.value()
+         self.value = result
+         self.close()
+
+         return result
+
+    def IconUserPasswordPopup(self, message, defaultText=None, icon=None):
+         result = None
+         popup = IconUserPasswordTextMsgBox(message, defaultText, icon, self)
+         popup.setWindowIcon(self.WIN_ICON)
          if popup.exec():
                 result = popup.value()
          self.value = result
@@ -602,6 +717,7 @@ class HVYMMainWindow(QMainWindow):
     def FilePopup(self, msg, filters=None):
          result = None
          popup = FileDialog(msg, filters, self)
+         popup.setWindowIcon(self.WIN_ICON)
          if popup.exec():
               result = popup.value()
          self.value = result
@@ -646,8 +762,14 @@ class HVYMInteraction(HVYMMainWindow):
       else:
            self.call = self.IconEditLinePopup(msg, options, defaultText, icon)
 
-    def password_popup(self, msg, defaultText=None, icon=str(LOGO_IMG)):
-      self.call = self.IconPasswordPopup(msg, defaultText, icon)
+    def user_popup(self, msg, icon=str(LOGO_IMG)):
+      self.call = self.IconUserPopup(msg, icon)
+
+    def password_popup(self, msg, icon=str(LOGO_IMG)):
+      self.call = self.IconPasswordPopup(msg, icon)
+
+    def user_password_popup(self, msg, defaultText=None, icon=str(LOGO_IMG)):
+      self.call = self.IconUserPasswordPopup(msg, defaultText, icon)
 
     def copy_text_popup(self, msg, defaultText=None, icon=str(LOGO_IMG)):
       self.call = self.IconCopyTextPopup(msg, defaultText, icon) 
@@ -1441,24 +1563,33 @@ def _run_command(cmd):
         print(output.decode('utf-8'))
     
 
-def _subprocess_output(command, path, procImg=LOADING_IMG):
+def _subprocess_output(command, path, procImg=LOADING_IMG, pw=None):
       loading = GifAnimation(procImg, 1000, True, '', True)
       loading.Play()
-      try:
-        output = subprocess.check_output(command, cwd=path, shell=True, stderr=subprocess.STDOUT)
-        print(_extract_urls(output.decode('utf-8')))
-        return output.decode('utf-8')
-      except Exception as e:
-        print("Command failed with error:", str(e))
+      if not pw:
+            try:
+                  output = subprocess.check_output(command, cwd=path, shell=True, stderr=subprocess.STDOUT)
+                  print(_extract_urls(output.decode('utf-8')))
+                  return output.decode('utf-8')
+            except Exception as e:
+                  print(f"Command failed with error @:{path} with cmd: {command}", str(e))
+      else:
+            try:
+                  child = spawn(command)
+                  child.expect('(?i)passphrase')
+                  child.sendline(pw)
+                  output = child.read().decode("utf-8")
+            except Exception as e:
+                  print(f"Command failed with error @:{path} with cmd: {command}", str(e))
       loading.Stop()
         
 
-def _subprocess(chain, folders, command, procImg=LOADING_IMG):
+def _subprocess(chain, folders, command, procImg=LOADING_IMG, pw=None):
       session = _get_session(chain)
       path = os.path.join(*folders)
       asset_path = os.path.join(session, path)
 
-      return _subprocess_output(command, asset_path, procImg)
+      return _subprocess_output(command, asset_path, procImg, pw)
 
 def _call(cmd):
       output = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -1585,15 +1716,61 @@ def _ic_get_active_id():
       return output.stdout
 
 
-def _ic_get_principal():
+def _ic_get_principal_by_id(id, pw=None):
+      principal = _ic_get_stored_principal(id)
+      if not principal:
+            if not _ic_account_is_encrypted(id.strip()):
+                  principal = _ic_get_principal(pw).strip()
+            else:
+                 principal = 'NOT SET'
+      return principal
+
+
+def _ic_get_stored_principal(id):
+      result = None
+      data = data = _find_IC_IDS_TABLE(id)
+      
+      if len(data) > 0 and 'principal' in data[0] and  data[0]['principal'] is not None and len(data[0]['principal']) >0:
+           result = data[0]['principal'].strip()
+
+      return result
+     
+
+def _ic_get_principal(pw=None):
+      command = f'{DFX} identity get-principal'
+      output = None
+      if not pw:
+           output = _ic_get_test_principal()
+      else:
+           child = spawn(command)
+           child.expect('(?i)passphrase')
+           child.sendline(pw)
+           output = child.read().decode("utf-8")
+           output = output.split('\r\n')
+           output = output[len(output)-2]
+
+      return output
+
+
+def _ic_get_test_principal():
       command = f'{DFX} identity get-principal'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
       return output.stdout
 
 
+def _ic_account_is_encrypted(id):
+     result = None
+     find = Query()
+     
+     found = IC_IDS.get((find.data_type == 'IC_ID_DATA') and (find.id == id))
+     if found and len(found) > 0:
+          result = found['encrypted']
+     return result
+
+
 def _ic_id_info():
       find = Query()
-      return IC_IDS.get(find.data_type == 'IC_ID_INFO')
+      return IC_IDS.get(find.data_type == 'IC_ID_ACTIVE')
 
 
 def _ic_set_id(cryptonym):
@@ -1602,8 +1779,10 @@ def _ic_set_id(cryptonym):
       _ic_update_data()
       return output.stdout
 
-def _ic_new_id(cryptonym):
-      return subprocess.check_output(f'{DFX} identity new {cryptonym}', shell=True, stderr=subprocess.STDOUT).decode("utf-8")
+
+def _ic_new_test_id(cryptonym):
+      return subprocess.check_output(f'{DFX} identity new {cryptonym} --storage-mode plaintext', shell=True, stderr=subprocess.STDOUT).decode("utf-8")
+
 
 def _ic_new_encrypted_id(cryptonym, pw):
       child = spawn(f"{DFX} identity new {cryptonym} --storage-mode password-protected")
@@ -1611,39 +1790,82 @@ def _ic_new_encrypted_id(cryptonym, pw):
       child.sendline(pw)
       return child.read().decode("utf-8")
 
-def _ic_update_data():
+def _ic_remove_id(cryptonym):
+      command = f'{DFX} identity remove {cryptonym}'
+      output = subprocess.run(command, shell=True, capture_output=True, text=True)
+      _ic_update_data()
+      return output.stdout
+
+def _update_IC_IDS_TABLE(table, key):
+     find = Query()
+     data = IC_IDS.search(find.id == table['id'])
+     if len(data)==0:
+          IC_IDS.insert(table)
+     else:
+          t = data[0]
+          if t[key] != table[key] and table[key] != '' and table[key] != 'NOT SET':
+            t[key] = table[key]
+            IC_IDS.update(t, find.id == table['id'])
+
+
+def _find_IC_IDS_TABLE(id):
+     find = Query()
+     data = IC_IDS.search(find['id'] == id)
+     return data
+     
+
+def _ic_update_data(pw=None, init=False):
       """Update local db with currently installed icp ids."""
+      encrypted = True
+
+      if not pw:
+           encrypted = False
+
       ids = _ic_get_ids()
-      active = _ic_get_active_id()
-      principal = _ic_get_principal()
+      active = _ic_get_active_id().strip()
+
+      if init and active.strip() != 'default' and active.strip() != 'anonymous':
+           return
+      
+      principal = _ic_get_principal_by_id(active, pw)
+
       ids=ids.split('\n')
       tables=[]
       id_arr=[]
+      active_table = None
       
       for _id in ids:
+            enc = encrypted
+            prn = principal
+            if _id.strip() == 'default' or _id.strip() == 'anonymous':
+                 enc = False
+                 if _id.strip() == 'anonymous':
+                      prn = '2vxsx-fae'
+
             if _id.strip() == active.strip():
-                  tables.append({'data_type': 'IC_ID_STATUS', 'id':_id.strip(), 'active': True})
+                  active_table = {'data_type': 'IC_ID_DATA', 'id':_id.strip(), 'encrypted': enc, 'principal': prn, 'active': True}
+                  tables.append(active_table)
                   id_arr.append(_id.strip())
             elif _id != '':
-                  tables.append({'data_type': 'IC_ID_STATUS', 'id':_id.strip(), 'active': False})
+                  tables.append({'data_type': 'IC_ID_DATA', 'id':_id.strip(), 'encrypted': None, 'principal': prn, 'active': False})
                   id_arr.append(_id.strip())
 
       find = Query()
 
       #Remove any ids from local storage that are no longer in dfx
-      stored_ids = IC_IDS.search(find.data_type == 'IC_ID_STATUS')
-      if len(IC_IDS.search(find.data_type == 'IC_ID_STATUS'))>len(id_arr):
+      stored_ids = IC_IDS.search(find.data_type == 'IC_ID_DATA')
+      if len(stored_ids)>len(id_arr):
             for table in stored_ids:
                   if not table['id'] in id_arr:
                         old_data = IC_IDS.get(find.id == table['id'])
                         IC_IDS.remove(doc_ids=[old_data.doc_id])
-      
-      for table in tables:
-            if len(IC_IDS.search(find.id == table['id']))==0:
-                  IC_IDS.insert(table)
-            else:
-                  IC_IDS.update(table, find.id == table['id'])
 
+      #Update active state for stored ids
+      for table in tables:
+            _update_IC_IDS_TABLE(table, 'active')
+            if table['id'] == active:
+                  _update_IC_IDS_TABLE(table, 'encrypted')
+                  _update_IC_IDS_TABLE(table, 'principal')
 
       #reorder list so active id is at the top
       for _id in id_arr:
@@ -1651,11 +1873,11 @@ def _ic_update_data():
             if id_data['active']:
                   id_arr.insert(0, id_arr.pop(id_arr.index(_id)))
 
-      table = {'data_type': 'IC_ID_INFO', 'active_id': id_arr[0], 'principal':principal.strip(), 'list':id_arr}
-      if len(IC_IDS.search(find.data_type == 'IC_ID_INFO'))==0:
+      table = {'data_type': 'IC_ID_ACTIVE', 'active_id': id_arr[0], 'principal':principal, 'encrypted': encrypted, 'list':id_arr}
+      if len(IC_IDS.search(find.data_type == 'IC_ID_ACTIVE'))==0:
             IC_IDS.insert(table)
       else:
-            IC_IDS.update(table, find.data_type == 'IC_ID_INFO')
+            IC_IDS.update(table, find.data_type == 'IC_ID_ACTIVE')
 
 
 def _ic_create_model_repo(path):
@@ -1699,14 +1921,16 @@ def _ic_create_model_repo(path):
       with open(os.path.join(path, 'Assets', 'dfx.json'), 'w') as f:
         json.dump(dfx_json, f)
 
-def _ic_assign_canister_id(project_name, project_type, canister_id):
+
+def js_r(filename: str):
+    with open(filename) as f_in:
+        return json.load(f_in)
+
+
+def _ic_assign_canister_id(project_type, canister_id):
       session = _get_session('icp')
       path = None
-      canister_ids_json = {
-        f"{project_name}": {
-            "ic": f"{canister_id}"
-        }
-      }
+      canister_ids_json = {}
 
       if project_type == 'model':
             path = os.path.join(session, MODEL_DEBUG_TEMPLATE)
@@ -1717,13 +1941,20 @@ def _ic_assign_canister_id(project_name, project_type, canister_id):
       elif project_type == 'assets':
             path = os.path.join(session, ASSETS_CLIENT_TEMPLATE)
 
+      dfx_file = os.path.join(path, 'dfx.json')
       json_file = os.path.join(path, 'canister_ids.json')
 
-      if os.path.isfile(json_file):
-            os.remove(json_file)
+      if os.path.isfile(dfx_file):
+            dfx = js_r(dfx_file)
 
-      with open(json_file, 'w') as f:
-        json.dump(canister_ids_json, f, indent=4)
+            for key in dfx['canisters'].keys():
+                  canister_ids_json[key] = canister_id
+
+            if os.path.isfile(json_file):
+                  os.remove(json_file)
+
+            with open(json_file, 'w') as f:
+                  json.dump(canister_ids_json, f, indent=4)
 
 def _ic_create_model_debug_repo(path):
       _download_unzip(MODEL_DEBUG_ZIP, path)
@@ -1879,14 +2110,20 @@ def _update_proprium_js_file():
       dst = os.path.join(npm_links,'proprium', 'index.js')
       shutil.copyfile(src, dst)
 
+def _add_db_file():
+      dirs = PlatformDirs('heavymeta-cli', 'HeavyMeta')
+      src = os.path.join(DATA_PATH, 'db.json')
+      dst = os.path.join(dirs.user_data_dir, 'db.json')
+      shutil.copyfile(src, dst)
+
 def _parse_hvym_data(hvym_data, model):
       all_val_props = {}
       all_call_props = {}
       contract_props = None
       data = {}
-      command = f'{DFX} identity get-principal'
-      output = _call(command)
-      creator_hash = _create_hex(output).upper()
+      active = _ic_get_active_id().strip()
+      principal = _ic_get_stored_principal(active)
+      creator_hash = _create_hex(principal.encode('utf-8')).upper()
 
       for key, value in hvym_data.items():
           if key != 'contract':
@@ -2555,7 +2792,7 @@ def icp_use_cryptonym(cryptonym):
 
 
 @click.command('icp-account')
-def icp_account(cryptonym):
+def icp_account():
       """Get the account number for the current active account."""
       command = f'{DFX} ledger account-id'
       output = subprocess.run(command, shell=True, capture_output=True, text=True)
@@ -2565,17 +2802,24 @@ def icp_account(cryptonym):
 @click.command('icp-principal')
 def icp_principal():
       """Get the current principal id for account."""
-      command = f'{DFX} identity get-principal'
-      output = subprocess.run(command, shell=True, capture_output=True, text=True)
-      click.echo(output.stdout)
+      active = _ic_get_active_id().strip()
+      principal = _ic_get_stored_principal(active.strip())
+      click.echo(principal)
+
+
+@click.command('icp-account-is-encrypted')
+@click.argument('cryptonym', type=str)
+def ic_account_is_encrypted(cryptonym):
+      """Get the stored principal for passed account."""
+      click.echo(_ic_account_is_encrypted(cryptonym))
 
 
 @click.command('icp-principal-hash')
 def icp_principal_hash():
       """Get the current principal id for account."""
-      command = f'{DFX} identity get-principal'
-      output = _call(command)
-      hexdigest = _create_hex(output)
+      active = _ic_get_active_id().strip()
+      principal = _ic_get_stored_principal(active)
+      hexdigest = _create_hex(principal.encode('utf-8'))
       click.echo(hexdigest.upper())
 
 
@@ -2610,6 +2854,7 @@ def icp_start_assets(project_type):
 @click.command('icp-stop-assets')
 @click.argument('project_type')
 def icp_stop_assets(project_type):
+      """ Shut down running dfx daemon."""
       if project_type == 'model':
             _ic_stop_daemon(MODEL_DEBUG_TEMPLATE)
       elif project_type == 'minter':
@@ -2639,11 +2884,14 @@ def icp_template(project_type):
 
 @click.command('icp-deploy-assets')
 @click.argument('project_type')
-@click.option('--test', is_flag=True, default=True, )
-def icp_deploy_assets(project_type, test):
+@click.option('--ic', is_flag=True, default=True, )
+def icp_deploy_assets(project_type, ic):
       """deploy the current asset canister."""
       command = f'{DFX} deploy'
-      if not test:
+      pw = None
+      if not ic:
+        popup = _password_popup('Enter the Account Passphrase.')
+        pw = popup.value
         command += ' ic'
 
       folders = [MODEL_DEBUG_TEMPLATE]
@@ -2655,7 +2903,7 @@ def icp_deploy_assets(project_type, test):
       elif project_type == 'assets':
             folders = [ASSETS_CLIENT_TEMPLATE]
         
-      return _subprocess('icp', folders, command, BUILDING_IMG)
+      return _subprocess('icp', folders, command, BUILDING_IMG, pw)
     
 
 @cli.command('icp-backup-keys')
@@ -2768,9 +3016,22 @@ def icp_new_account():
       click.echo(_ic_new_encrypted_account_popup())
 
 
+@click.command('icp-new-test-account')
+def icp_new_test_account():
+      """Create a new icp test(unencrypted) account"""
+      click.echo(_ic_new_test_account_popup())
+
+
+@click.command('icp-remove-account')
+def icp_remove_account():
+      """Select an IC account to remove"""
+      click.echo(_ic_remove_account_dropdown_popup())
+
+
 @click.command('img-to-url')
 @click.argument('msg', type=str)
 def img_to_url(msg):
+      """ Show file selection popup, then convert selected file to base64 string."""
       click.echo(_prompt_img_convert_to_url(msg))
 
 
@@ -2838,9 +3099,9 @@ def icp_init(project_type, force, quiet):
       click.echo(f"Project files created at: {install_path}.")
 
 
-@click.command('icp-debug-model')
+@click.command('icp-update-model')
 @click.argument('model', type=str)
-def icp_debug_model(model):
+def icp_update_model(model):
       """Set up nft collection deploy directories & render model debug templates."""
       path = _ic_model_debug_path()
       front_src_dir = os.path.join(path, 'src', 'frontend')
@@ -2872,12 +3133,11 @@ def icp_debug_model(model):
       _render_template(TEMPLATE_MODEL_VIEWER_JS, data, out_file_path)
 
 
-
-@click.command('icp-debug-model-minter')
+@click.command('icp-update-model-minter')
 @click.argument('model', type=str)
-def icp_debug_model_minter(model):
+def icp_update_model_minter(model):
       """Set up nft collection deploy directories"""
-      print('icp_debug_model_minter')
+      print('icp_update_model_minter')
       print(model)
       loading = GifAnimation(LOADING_IMG, 1000, True, '', True)
       loading.Play()
@@ -2888,11 +3148,6 @@ def icp_debug_model_minter(model):
 
       model_path = os.path.join(_ic_minter_model_path(), model)
       hvym_data = _load_hvym_data(model_path)
-
-      print('model_path')
-      print(model_path)
-      print('hvym_data')
-      print(hvym_data)
 
       if hvym_data == None:
             return
@@ -2925,10 +3180,10 @@ def icp_debug_model_minter(model):
       loading.Stop()
 
 
-@click.command('icp-debug-custom-client')
+@click.command('icp-update-custom-client')
 @click.argument('model', type=str)
 @click.argument('backend', type=str)
-def icp_debug_custom_client(model, backend):
+def icp_update_custom_client(model, backend):
       """ deploy directories & render custom client debug templates."""
       if not os.path.isdir(backend):
             return
@@ -2972,23 +3227,23 @@ def icp_debug_custom_client(model, backend):
 
 
 @click.command('icp-assign-canister-id')
-@click.argument('project_name', type=str)
 @click.argument('project_type', type=str)
 @click.argument('canister_id', type=str)
-def icp_assign_canister_id(project_name, project_type, canister_id):
+def icp_assign_canister_id(project_type, canister_id):
       """ Assign canister id to active ic project. """
-      _ic_assign_canister_id(project_name, project_type, canister_id)
-
+      _ic_assign_canister_id(project_type, canister_id)
 
 @click.command('svg-to-data-url')
 @click.argument('svgfile', type=str)
 def svg_to_data_url(svgfile):
+      """ Convert an svg file to data url. """
       click.echo(_svg_to_data_url(svgfile))
 
 
 @click.command('png-to-data-url')
 @click.argument('pngfile', type=str)
 def png_to_data_url(pngfile):
+      """ Convert a png file to data url. """
       click.echo(_png_to_data_url(pngfile))
 
 @click.command('update-npm-modules')
@@ -3023,7 +3278,7 @@ def custom_loading_msg(msg):
       loading.Play()
       time.sleep(5)
       loading.Stop()
-
+      
 
 @click.command('custom-prompt')
 @click.argument('msg', type=str)
@@ -3032,16 +3287,10 @@ def custom_prompt(msg):
       _prompt_popup(f'{msg}')
 
 
-@click.command('custom-prompt-wide')
-@click.argument('msg', type=str)
-def custom_prompt_wide(msg):
-      """ Show custom wide prompt based on passed text."""
-      _prompt_popup(f'{msg}')
-
-
 @click.command('custom-choice-prompt')
 @click.argument('msg', type=str)
 def custom_choice_prompt(msg):
+      """ Display a custom message prompt. """
       click.echo(_choice_popup(f'{msg}').value)
 
 
@@ -3054,7 +3303,8 @@ def splash():
 @click.command('test')
 def test():
       """Set up nft collection deploy directories"""
-      _ic_account_dropdown_popup()
+      _ic_update_data()
+      #_ic_account_dropdown_popup()
 
 
 @click.command('print-hvym-data')
@@ -3089,25 +3339,37 @@ def _splash(text):
       interaction = HVYMInteraction()
       interaction.splash(text)
 
-def _msg_popup(msg, icon=None):
+def _msg_popup(msg, icon=str(LOGO_IMG)):
       interaction = HVYMInteraction()
       interaction.msg_popup(msg, icon)
 
-def _options_popup(msg, options,icon=None):
+def _options_popup(msg, options,icon=str(LOGO_IMG)):
       interaction = HVYMInteraction()
       interaction.options_popup(msg, options, icon)
       
       return interaction
 
-def _edit_line_popup(msg, options, defaultText=None, icon=None):
+def _edit_line_popup(msg, options, defaultText=None, icon=str(LOGO_IMG)):
       interaction = HVYMInteraction()
       interaction.edit_line_popup(msg, options, defaultText, icon)
 
       return interaction
 
-def _password_popup(msg, defaultText=None, icon=str(LOGO_IMG)):
+def _user_popup(msg, icon=str(LOGO_IMG)):
       interaction = HVYMInteraction()
-      interaction.password_popup(msg, defaultText, icon)
+      interaction.user_popup(msg, icon)
+
+      return interaction
+
+def _password_popup(msg, icon=str(LOGO_IMG)):
+      interaction = HVYMInteraction()
+      interaction.password_popup(msg, icon)
+
+      return interaction
+
+def _user_password_popup(msg, defaultText=None, icon=str(LOGO_IMG)):
+      interaction = HVYMInteraction()
+      interaction.user_password_popup(msg, defaultText, icon)
 
       return interaction
 
@@ -3128,7 +3390,7 @@ def _prompt_popup(msg):
       """ Show choice popup, message based on passed msg arg."""
       _msg_popup(msg)
 
-def _file_select_popup(msg, filters=None, icon=str(LOGO_IMG)):
+def _file_select_popup(msg, filters=None, icon=str(LOGO_CHOICE_IMG)):
       interaction = HVYMInteraction()
       interaction.file_select_popup(msg, filters)
 
@@ -3157,7 +3419,7 @@ def _prompt_img_convert_to_url(msg):
 def _ic_account_dropdown_popup(confirmation=True):
       _ic_update_data()
       data = _ic_id_info()
-      text = '''Choose Account:'''
+      text = 'Choose Account:'
       popup = _options_popup(text, data['list'], str(ICP_LOGO_IMG))
       select = popup.value
 
@@ -3172,17 +3434,17 @@ def _ic_account_dropdown_popup(confirmation=True):
 
 def _ic_new_encrypted_account_popup():
       find = Query()
-      data = IC_IDS.get(find.data_type == 'IC_ID_INFO')
+      data = IC_IDS.get(find.data_type == 'IC_ID_ACTIVE')
       text = 'Enter a name for the new account:'
-      popup = _password_popup(text, None, str(ICP_LOGO_IMG))
+      popup = _user_password_popup(text, None, str(ICP_LOGO_IMG))
 
       if not popup:
             return
       
       answer = popup.value
 
-      if len(answer['user']) == 0 or len(answer['pw']) == 0:
-           _msg_popup('All fields must be filled in.', str(ICP_LOGO_IMG))
+      if answer == None or len(answer['user']) == 0 or len(answer['pw']) == 0:
+           _msg_popup('All fields must be filled in.', str(LOGO_WARN_IMG))
            return
            
       if answer != None and answer != '' and answer != 'CANCEL':
@@ -3197,11 +3459,76 @@ def _ic_new_encrypted_account_popup():
                   '''
                   seed = arr3[1].strip()
                   _copy_text_popup(text, seed, str(ICP_LOGO_IMG))
-                  _ic_update_data()
+                  _ic_update_data(pw)
                   _msg_popup(f'New account has been created and changed to: {user}', str(ICP_LOGO_IMG))
             elif user in data['list']:
-                 _msg_popup(f'{user} exists already, try a different account name.', str(ICP_LOGO_IMG))
+                 _msg_popup(f'{user} exists already, try a different account name.', str(LOGO_WARN_IMG))
                  _ic_new_encrypted_account_popup()
+
+      return data['active_id']
+
+
+def _ic_new_test_account_popup():
+      find = Query()
+      data = IC_IDS.get(find.data_type == 'IC_ID_ACTIVE')
+      text = 'Enter a name for the new test account:'
+      popup = _user_popup(text, str(ICP_LOGO_IMG))
+
+      if not popup:
+            return
+      
+      user = popup.value
+
+      if user == None or len(user) == 0:
+           _msg_popup('All fields must be filled in.', str(ICP_LOGO_IMG))
+           return
+           
+      if user != None and user != '' and user != 'CANCEL':
+            if user not in data['list']:
+                  popup = _choice_popup(f"This is a test account and shouldn't be used to store actual funds, as it lacks encryption.", str(LOGO_WARN_IMG))
+                  choice = popup.value
+                  if choice == 'OK':
+                        dfx = _ic_new_test_id(user)
+                        _ic_set_id(user)
+                        arr = dfx.split(':')
+                        text = arr[0].strip()+'''\nMake sure to store it in a secure place.'''
+                        seed = arr[1].replace('This can be used to reconstruct your key in case of emergency, so write it down in a safe place.', '').strip()
+                        seed = seed.replace('Created identity', '').strip()
+                        _copy_text_popup(text, seed, str(ICP_LOGO_IMG))
+                        _ic_update_data()
+                        _msg_popup(f'New account has been created and changed to: {user}', str(ICP_LOGO_IMG))
+                  elif user in data['list']:
+                        _msg_popup(f'{user} exists already, try a different account name.', str(LOGO_WARN_IMG))
+                        _user_popup()
+
+      return data['active_id']
+
+
+def _ic_remove_account_dropdown_popup(confirmation=True):
+      _ic_update_data()
+      data = _ic_id_info()
+      pruned = copy.copy(data['list'])
+      pruned.remove('default')
+      pruned.remove('anonymous')
+
+      if len(pruned)==0:
+           _msg_popup(f'Only default accounts are present, nothing to remove.', str(LOGO_WARN_IMG))
+           return
+      
+      text = 'Choose Account:'
+      popup = _options_popup(text, pruned, str(ICP_LOGO_IMG))
+      select = popup.value
+
+      if select != None:
+            popup = _choice_popup(f'Are you sure you want to delete {select}', str(LOGO_CHOICE_IMG))
+            choice = popup.value
+            if choice == 'OK':
+                  _ic_set_id('default')
+                  _ic_remove_id(select.strip())
+                  data = _ic_id_info()
+                  _ic_update_data()
+                  if confirmation:
+                        _msg_popup(f'{select} account removed, active account is now: default', str(ICP_LOGO_IMG))
 
       return data['active_id']
 
@@ -3235,6 +3562,7 @@ cli.add_command(icp_use_id)
 cli.add_command(icp_use_cryptonym)
 cli.add_command(icp_account)
 cli.add_command(icp_principal)
+cli.add_command(ic_account_is_encrypted)
 cli.add_command(icp_principal_hash)
 cli.add_command(icp_balance)
 cli.add_command(icp_start_assets)
@@ -3252,11 +3580,13 @@ cli.add_command(icp_model_path)
 cli.add_command(icp_account_info)
 cli.add_command(icp_set_account)
 cli.add_command(icp_new_account)
+cli.add_command(icp_new_test_account)
+cli.add_command(icp_remove_account)
 cli.add_command(img_to_url)
 cli.add_command(icp_init)
-cli.add_command(icp_debug_model)
-cli.add_command(icp_debug_model_minter)
-cli.add_command(icp_debug_custom_client)
+cli.add_command(icp_update_model)
+cli.add_command(icp_update_model_minter)
+cli.add_command(icp_update_custom_client)
 cli.add_command(icp_assign_canister_id)
 cli.add_command(svg_to_data_url)
 cli.add_command(png_to_data_url)
@@ -3266,7 +3596,6 @@ cli.add_command(check)
 cli.add_command(up)
 cli.add_command(custom_loading_msg)
 cli.add_command(custom_prompt)
-cli.add_command(custom_prompt_wide)
 cli.add_command(custom_choice_prompt)
 cli.add_command(splash)
 cli.add_command(test)
@@ -3274,6 +3603,8 @@ cli.add_command(print_hvym_data)
 cli.add_command(version)
 cli.add_command(about)
 
-_ic_update_data()
+_ic_update_data(None, True)
 if __name__ == '__main__':
+    APP = QApplication(sys.argv)
     cli()
+    sys.exit(APP.exec())
